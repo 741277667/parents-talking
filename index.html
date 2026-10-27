@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>耳根清净 · 应对父母沟通压力的模拟聊天</title>
+<meta name="description" content="先别急着回复，我们一起想想怎么说。基于预设沟通策略的模拟聊天工具，纯本地运行，不上传任何内容。">
+<style>
+  :root{
+    --bg:#ededed; --panel:#f7f7f7; --card:#ffffff;
+    --ink:#191919; --ink2:#7a7a7a; --line:#e0e0e0;
+    --green:#07c160; --bubble-self:#95ec69; --bubble-else:#ffffff;
+    --accent:#07c160; --warn:#fa9d3b; --danger:#fa5151;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:#d8d8d8; color:var(--ink); font-size:16px; line-height:1.55;
+  }
+  #phone{
+    max-width:480px; height:100dvh; margin:0 auto; background:var(--bg);
+    display:flex; flex-direction:column; position:relative; overflow:hidden;
+    box-shadow:0 0 40px rgba(0,0,0,.15);
+  }
+  @media (min-width:520px){ body{padding:16px 0;} #phone{height:calc(100dvh - 32px); border-radius:24px;} }
+
+  /* ---------- 通用 ---------- */
+  .view{flex:1; display:flex; flex-direction:column; min-height:0;}
+  .view[hidden]{display:none;}
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:none; border-radius:10px; cursor:pointer; font-size:16px; font-family:inherit;
+    padding:12px 18px; transition:filter .15s;
+  }
+  .btn:active{filter:brightness(.92);}
+  .btn-primary{background:var(--green); color:#fff;}
+  .btn-ghost{background:#fff; color:var(--ink); border:1px solid var(--line);}
+  .btn-danger-ghost{background:#fff; color:var(--danger); border:1px solid #f3c1c1;}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px;
+    background:#fff; border:1px solid var(--line); font-size:14px; cursor:pointer; color:var(--ink);
+    font-family:inherit; white-space:nowrap;
+  }
+  .chip:active{background:#f0f0f0;}
+  .tag{display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; color:#fff;}
+
+  /* ---------- 首页 ---------- */
+  #home{padding:0; overflow-y:auto;}
+  .home-hero{padding:44px 24px 20px;}
+  .home-hero h1{font-size:34px; letter-spacing:2px;}
+  .home-hero .sub{color:var(--ink2); margin-top:8px; font-size:15px;}
+  .home-hero .features{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
+  .feat{font-size:12px; color:var(--ink2); background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px 10px;}
+  .home-body{padding:8px 24px 32px;}
+  .sec-title{font-size:13px; color:var(--ink2); margin:20px 0 10px;}
+  .sc-grid{display:flex; flex-wrap:wrap; gap:10px;}
+  .home-note{margin-top:26px; padding:14px 16px; background:#fff; border-radius:12px; border:1px solid var(--line); font-size:13px; color:var(--ink2);}
+  .home-note b{color:var(--ink); font-weight:600;}
+  .home-foot{display:flex; align-items:center; justify-content:space-between; margin-top:22px; gap:10px;}
+  .foot-mini{font-size:12px; color:#aaa;}
+
+  /* ---------- 聊天页 ---------- */
+  #chat{height:100%;}
+  .chat-head{
+    background:var(--panel); border-bottom:1px solid var(--line);
+    padding:10px 14px 8px; flex-shrink:0;
+  }
+  .chat-head .row1{display:flex; align-items:center; gap:10px;}
+  .back{border:none; background:none; font-size:22px; line-height:1; cursor:pointer; color:var(--ink); padding:2px 6px; font-family:inherit;}
+  .chat-title{font-size:17px; font-weight:600; flex:1; text-align:center;}
+  .head-actions{display:flex; gap:2px;}
+  .icon-btn{border:none; background:none; font-size:13px; color:var(--ink2); cursor:pointer; padding:6px; border-radius:8px; font-family:inherit;}
+  .icon-btn:active{background:#e8e8e8;}
+  .stage-bar{display:flex; gap:6px; margin-top:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;}
+  .stage-bar::-webkit-scrollbar{display:none;}
+  .stage-chip{
+    flex-shrink:0; font-size:12px; padding:4px 10px; border-radius:999px; cursor:pointer;
+    background:#fff; border:1px solid var(--line); color:var(--ink2); font-family:inherit;
+  }
+  .stage-chip.on{background:var(--green); border-color:var(--green); color:#fff;}
+  .stage-chip.auto.on{background:#576b95; border-color:#576b95;}
+  #msgs{flex:1; overflow-y:auto; padding:14px 12px 8px; min-height:0;}
+  .m-row{display:flex; margin-bottom:12px; align-items:flex-end; gap:8px;}
+  .m-row.self{flex-direction:row-reverse;}
+  .avatar{
+    width:38px; height:38px; border-radius:8px; flex-shrink:0; display:flex; align-items:center;
+    justify-content:center; font-size:17px; color:#fff;
+  }
+  .avatar.parent{background:#c8b28a;}
+  .avatar.sys{background:var(--green);}
+  .bubble{
+    max-width:72%; padding:10px 13px; border-radius:10px; position:relative; font-size:16px;
+    word-break:break-word; white-space:pre-wrap;
+  }
+  .m-row.rev{flex-direction:row-reverse;}
+  .bubble.parent{background:var(--bubble-self); border-radius:10px 2px 10px 10px;}
+  .bubble.self{background:var(--bubble-else); border-radius:2px 10px 10px 10px; cursor:pointer;}
+  .bubble.self.plain{background:#e5e5e5; color:var(--ink2); cursor:default; font-size:14px; border-radius:10px 2px 10px 10px;}
+  .m-info{text-align:center; font-size:12px; color:#a0a0a0; margin:16px 0 12px;}
+  .m-info span{background:#dfdfdf; padding:3px 10px; border-radius:4px;}
+  .fallback-box{
+    max-width:86%; margin:0 auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; font-size:14px;
+  }
+  .fallback-box .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+  .tone-label{font-size:12px; color:var(--ink2); margin:0 4px 4px; text-align:left;}
+  .generic-note{font-size:12px; color:#a0a0a0; margin-top:5px;}
+  .tone-label b{color:var(--green); font-weight:600;}
+
+  .bubble-actions{display:flex; justify-content:flex-start; gap:14px; margin-top:5px;}
+  .bubble-actions a{font-size:12px; color:#576b95; cursor:pointer; text-decoration:none;}
+  .bubble-actions a:active{opacity:.6;}
+  .input-bar{
+    display:flex; gap:8px; padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    background:var(--panel); border-top:1px solid var(--line); flex-shrink:0; align-items:flex-end;
+  }
+  #input{
+    flex:1; border:none; border-radius:8px; background:#fff; padding:10px 12px; font-size:16px;
+    font-family:inherit; resize:none; max-height:110px; line-height:1.4; outline:none;
+  }
+  #send{background:var(--green); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:15px; cursor:pointer; font-family:inherit; flex-shrink:0;}
+  #send:active{filter:brightness(.92);}
+
+  /* ---------- 攻略库 ---------- */
+  #guide{overflow-y:auto;}
+  .guide-head{background:var(--panel); border-bottom:1px solid var(--line); padding:10px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0;}
+  .guide-head h2{font-size:17px; flex:1; text-align:center;}
+  .guide-body{padding:16px 16px 40px;}
+  .g-sc{margin-bottom:22px;}
+  .g-sc-title{display:flex; align-items:center; gap:8px; font-size:15px; font-weight:600; margin-bottom:10px;}
+  .g-unit{background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden;}
+  .g-unit-head{padding:12px 14px; cursor:pointer; display:flex; align-items:center; gap:8px;}
+  .g-unit-head .nm{font-weight:600; font-size:15px; flex:1;}
+  .g-unit-head .arr{color:#bbb; font-size:13px; transition:transform .2s;}
+  .g-unit.open .g-unit-head .arr{transform:rotate(90deg);}
+  .g-unit-body{display:none; padding:0 14px 14px; border-top:1px dashed var(--line);}
+  .g-unit.open .g-unit-body{display:block;}
+  .g-field{margin-top:10px; font-size:14px;}
+  .g-field .lb{font-size:12px; color:var(--green); font-weight:600; display:block; margin-bottom:2px;}
+  .g-reply{background:#f4faf4; border:1px solid #d9ecd9; border-radius:8px; padding:8px 10px; margin-top:4px; font-size:14px;}
+  .g-reply b{font-size:12px; color:var(--green);}
+
+  /* ---------- 底部弹层 ---------- */
+  #mask{position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:20;}
+  #sheet[hidden]{display:none;}
+  #sheet{
+    position:absolute; left:0; right:0; bottom:0; z-index:21; background:#fff;
+    border-radius:16px 16px 0 0; max-height:78%; display:flex; flex-direction:column;
+    animation:up .22s ease-out;
+  }
+  @keyframes up{from{transform:translateY(40%); opacity:.4;} to{transform:none; opacity:1;}}
+  .sheet-head{padding:14px 18px 8px; display:flex; align-items:center; gap:8px;}
+  .sheet-head h3{font-size:17px; flex:1;}
+  .sheet-close{border:none; background:#f2f2f2; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:14px; color:#888; font-family:inherit;}
+  .tone-tabs{display:flex; gap:8px; padding:4px 18px 10px; border-bottom:1px solid var(--line);}
+  .tone-tab{flex:1; text-align:center; font-size:14px; padding:8px 0; border-radius:8px; background:#f4f4f4; color:var(--ink2); cursor:pointer; border:none; font-family:inherit;}
+  .tone-tab.on{background:var(--green); color:#fff; font-weight:600;}
+  .sheet-body{overflow-y:auto; padding:14px 18px calc(20px + env(safe-area-inset-bottom));}
+  .sheet-reply{background:#f4faf4; border:1px solid #d9ecd9; border-radius:10px; padding:12px 14px; font-size:16px;}
+  .sheet-copy{margin-top:8px; width:100%; padding:9px 0; font-size:14px;}
+  .toast{
+    position:absolute; left:50%; bottom:110px; transform:translateX(-50%);
+    background:rgba(0,0,0,.75); color:#fff; font-size:13px; padding:8px 16px; border-radius:8px;
+    z-index:30; pointer-events:none; opacity:0; transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+
+  /* 应用内确认框（沙箱 iframe 会拦截原生 confirm） */
+  #cbox{position:absolute; inset:0; z-index:40; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:32px;}
+  #cbox[hidden]{display:none;}
+  .cbox-card{background:#fff; border-radius:14px; padding:20px 18px 16px; width:100%; max-width:320px;}
+  .cbox-card p{font-size:15px; margin-bottom:16px;}
+  .cbox-btns{display:flex; gap:10px;}
+  .cbox-btns .btn{flex:1; padding:10px 0; font-size:15px;}
+</style>
+</head>
+<body>
+<div id="phone">
+
+  <!-- 首页 -->
+  <section class="view" id="home">
+    <div class="home-hero">
+      <h1>耳根清净</h1>
+      <p class="sub">先别急着回复，我们一起想想怎么说。</p>
+      <div class="features">
+        <span class="feat">无需 AI 接口</span>
+        <span class="feat">规则驱动</span>
+        <span class="feat">模拟微信聊天</span>
+        <span class="feat">内容仅存本地</span>
+      </div>
+    </div>
+    <div class="home-body">
+      <p class="home-note">有些话，你不想吵架，也不想再忍着听完。这里可以先陪你练习：粘贴她说过的话，得到一条能用的回复，看懂它为什么有效，再练下一轮。</p>
+      <p class="sec-title">选择一个开始方式</p>
+      <div class="sc-grid" id="sc-grid"></div>
+      <button class="btn btn-primary" id="btn-start-free" style="width:100%; margin-top:16px;">开始模拟</button>
+      <p class="sec-title">或者</p>
+      <button class="btn btn-ghost" id="btn-guide" style="width:100%;">看看应对攻略</button>
+      <div class="home-foot">
+        <span class="foot-mini">v1.1 · 94 条策略 · 语料库驱动 · 全部本地运行，内容不上传</span>
+        <button class="icon-btn" id="btn-clear" style="color:var(--danger);">清除本地记录</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 聊天页 -->
+  <section class="view" id="chat" hidden>
+    <div class="chat-head">
+      <div class="row1">
+        <button class="back" id="btn-back" aria-label="返回">‹</button>
+        <div class="chat-title" id="chat-title">耳根清净</div>
+        <div class="head-actions">
+          <button class="icon-btn" id="btn-undo">撤销</button>
+          <button class="icon-btn" id="btn-restart">重新开始</button>
+        </div>
+      </div>
+      <div class="stage-bar" id="stage-bar"></div>
+    </div>
+    <div id="msgs"></div>
+    <div class="input-bar">
+      <textarea id="input" rows="1" placeholder="粘贴或输入她说的话…" enterkeyhint="send"></textarea>
+      <button id="send">发送</button>
+    </div>
+  </section>
+
+  <!-- 攻略库 -->
+  <section class="view" id="guide" hidden>
+    <div class="guide-head">
+      <button class="back" id="btn-guide-back" aria-label="返回">‹</button>
+      <h2>应对攻略库</h2>
+      <span style="width:34px;"></span>
+    </div>
+    <div class="guide-body" id="guide-body"></div>
+  </section>
+
+  <div id="mask" hidden></div>
+  <div id="sheet" hidden>
+    <div class="sheet-head">
+      <h3 id="sheet-title">应对攻略</h3>
+      <button class="sheet-close" id="sheet-close">✕</button>
+    </div>
+    <div class="tone-tabs" id="tone-tabs"></div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div id="cbox" hidden>
+    <div class="cbox-card">
+      <p id="cbox-text"></p>
+      <div class="cbox-btns">
+        <button class="btn btn-ghost" id="cbox-no">取消</button>
+        <button class="btn btn-primary" id="cbox-yes">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+   耳根清净 v1.0 —— 纯前端规则引擎
+   六类情境 × 四个阶段 × 三种语气 × 34 条策略单元
+   ===================================================== */
+
+var SCENARIOS = {
+  marriage: { name:'催婚与婚恋', chip:'她在催我', color:'#e6a23c' },
+  relationship: { name:'伴侣选择与性取向', chip:'她在干涉我的伴侣选择', color:'#e84393' },
+  career: { name:'工作与未来', chip:'她在谈工作和未来', color:'#2d98da' },
+  life_control: { name:'生活干涉', chip:'她在干涉我的生活', color:'#f56c6c' },
+  lecture: { name:'抽象说教', chip:'她在讲大道理', color:'#409eff' },
+  repetition: { name:'重复说教', chip:'她在重复说教', color:'#8d8d8d' },
+  criticism: { name:'否定与比较', chip:'她在否定比较我', color:'#fa5151' },
+  guilt: { name:'情绪施压与牺牲', chip:'她在打感情牌', color:'#9b59b6' },
+  money_duty: { name:'金钱与孝顺', chip:'她在谈钱和孝顺', color:'#0fb9b1' },
+  privacy: { name:'隐私与信息边界', chip:'她在打探隐私', color:'#8854d0' },
+  relatives: { name:'亲戚与家庭面子', chip:'她在拿亲戚面子说事', color:'#20bf6b' },
+  boundaries: { name:'联系频率与对话边界', chip:'她在轰炸我的联系方式', color:'#576b95' },
+};
+
+var STAGES = [
+  { key:1, name:'确认诉求', short:'确认诉求', desc:'弄清她到底想要什么' },
+  { key:2, name:'引向具体', short:'引向具体', desc:'把抽象要求变成具体行动' },
+  { key:3, name:'简短周旋', short:'简短周旋', desc:'不再反复解释自己' },
+  { key:4, name:'收住话题', short:'收住话题', desc:'自己处理，暂停讨论' }
+];
+
+var TONES = { g:'温和版', b:'周旋版', f:'坚定版' };
+var TONE_ORDER = ['g','b','f'];
+var DEFAULT_TONE = { 1:'g', 2:'g', 3:'b', 4:'f' };
+
+/* 策略单元字段：
+   id, sc(情境), stage(建议阶段), name(策略名), kw(附加触发词),
+   r:{g温和,b周旋,f坚定}, fit适合情况, core核心问题, why为什么, next她可能怎么接+应对, alt替代说法 */
+var STRATEGIES = [
+  /* ---------- 催婚与关系 ---------- */
+  { id:'M1', sc:'marriage', stage:1, name:'把催促变成提问', kw:['上心','接触','眼光'],
+    r:{ g:'我知道你是希望我以后过得好。那你希望我具体做到哪一步？比如多久认识多少人，还是先从谁开始？',
+        b:'行，那咱们把标准定下来：你介绍的，得符合什么条件？定清楚了才有得谈。',
+        f:'这件事的节奏我来定。你有资源可以提供，但别替我安排。' },
+    fit:'她泛泛地催你"要上心""多接触"，说不出任何具体方案。',
+    core:'她的真实诉求是"看到你在动"，而不是真的有安排。',
+    why:'把"催"转化成"提议"，检验她是随口说教还是真愿意出力。愿意出力的人会接着给方案；只想说教的人会开始绕。',
+    next:'她若给出具体安排 → 进入 M2 索要时间点；她若继续空谈"总之你要主动" → 不接空话，直接跳 M3 简短回应。',
+    alt:'"你说的上心，具体是指什么？一周约几个人，还是先见谁？你说一个，我来配合。"' },
+  { id:'M2', sc:'marriage', stage:2, name:'索要具体安排', kw:['名单','约时间','什么时候介绍','说定了'],
+    r:{ g:'好啊，那你先帮我准备几个，我们约个时间见见看。什么时候方便？',
+        b:'可以。什么时候？地点你定还是我定？你给个准话，我就当这件事推进了。',
+        f:'那就等你的具体安排。没有安排之前，这个话题先到这。' },
+    fit:'她表态"会帮你介绍"，但一直不给时间和对象。',
+    core:'把口头承诺变成可核对的行动，避免她永远停在"为你好"。',
+    why:'追问时间点是最省力的反制：对方要么兑现、要么暴露自己只想说说。这是"谜底"里验证过的核心打法——反复问"什么时候帮我物色"，直到她给出具体条件。',
+    next:'她给出时间/条件 → 确认并到此为止："行，那我等你消息"；她开始拖延或转移话题 → 记下这个承诺，下次直接引用："你上次说的呢？"' },
+  { id:'M3', sc:'marriage', stage:3, name:'简短接住', kw:[],
+    r:{ g:'嗯，我会留意的。', b:'知道了，有合适的你发我。', f:'这事我说了会处理。' },
+    fit:'同样的催促已经重复过两轮以上，再解释只是给争吵递话。',
+    core:'停止为同一个问题反复自证，用最小回应维持表面平静。',
+    why:'重复说教吃的就是你的回应欲。回应越短，她的施压循环越快断电。你说"不说了"，这场对话就是你赢的。',
+    next:'她继续加码 → 不升级、不解释，保持一句话回应；她升级到指责 → 切到否定与指责情境（B 系列策略）。',
+    alt:'"嗯。" "知道了。" "到时候再说。"' },
+  { id:'M4', sc:'marriage', stage:4, name:'收住婚恋话题', kw:['先到这','不说了','聊别的'],
+    r:{ g:'这件事我自己会安排，咱们今天先聊到这。你最近身体怎么样？',
+        b:'我有数了，以后有进展我主动说。这个话题先停，换一个吧。',
+        f:'这个话题到此为止。我的事我会负责，以后不用反复提。' },
+    fit:'讨论已经完成（有承诺或已表态），她仍在原地绕圈。',
+    core:'主动结束话题，把结束权握在自己手里。',
+    why:'她说不说了，是她赢了；你说不说了，才是你赢了。主动收尾不是逃避，是拒绝让对话在重复里无限消耗你。',
+    next:'她说"你这孩子怎么这样" → 不接，重复一次"这事我会处理"；她转向新话题 → 正常接，给关系留出空间。',
+    alt:'"好，这事翻篇。最近吃了什么好的，发我看看。"' },
+  { id:'M5', sc:'marriage', stage:2, name:'拒绝捆绑条件', kw:['条件','交换','挂钩','两件事','不挂钩'],
+    r:{ g:'介绍我可以谈，但让我和朋友保持距离这个条件我不接受。这是两件事，不挂钩。',
+        b:'你介绍你的，我交我的朋友。把两件事绑在一起，那就都谈不成。',
+        f:'我不会拿朋友做交换。要么分开谈，要么都别谈。' },
+    fit:'她把"介绍对象"和"你要改掉某种生活方式/远离某些朋友"打包成条件。',
+    core:'识破捆绑：用一个好处，换你交出另一块自主权。',
+    why:'接受捆绑条件，以后每次都会被重新要价。当场拆开，才能守住边界——这也符合"抓中心主旨、回避侧面因素"：只回应介绍本身，不顺带接受附加条款。',
+    next:'她坚持"不处理好生活人家看不上你" → "我的生活我自己评估，不需要预审"；她退回只谈介绍 → 回到 M2 索要具体安排。',
+    alt:'"好男人要是介意我有自己的朋友，那说明他不是好男人，不是我的问题。"' },
+  { id:'M6', sc:'marriage', stage:2, name:'锁定口头承诺', kw:['毕业','等你毕业','到时候'],
+    r:{ g:'行，那我们就说定了：等你说的那个时间，你先给我名单。',
+        b:'好，这话我记下了。到时候我会来问你要的。',
+        f:'行。那在那天之前，这个话题不用再提。' },
+    fit:'她用"等你毕业""以后再说"把事情无限推后，又不想让话题结束。',
+    core:'把"以后"变成一个可追溯的约定，换来现在的清净。',
+    why:'接受"以后"却不锁定，等于把话题的重新开启权留给了她——她随时可以说"你都没上心"。锁死时间点，主动权就换到你手里。',
+    next:'到点她兑现 → 走 M2 流程；到点她装忘 → "上次说好的，这个月该有名单了吧"；她提前又来催 → "不是说好了到那时候吗？"',
+    alt:'"行，那我等着。你帮我好好准备几个——这话可是你说的。"' },
+
+  /* ---------- 抽象说教 ---------- */
+  { id:'A1', sc:'lecture', stage:1, name:'大道理落地', kw:['积极一点','上进一点','说个具体的'],
+    r:{ g:'你说的我记下了。那具体到现在，你觉得我该先做哪件事？',
+        b:'道理我都懂。你直接说：第一步做什么？',
+        f:'这些词太大了。给我一件具体的事，我来判断做不做。' },
+    fit:'她输出"你要积极一点""要懂事""要上进"这类无法执行的形容词。',
+    core:'抽象说教无法被完成，所以永远"不够"。唯一的出口是把它逼成具体动作。',
+    why:'"具体问题具体回应"：对方给不出具体动作，就证明这段说教没有信息量——这既给了你简短回应的理由，也不必指控她故意操纵。',
+    next:'她给出具体建议 → 认真评估，能做就做，做不了说原因；她开始绕（"反正就是为你好"）→ 重复一次问题后进入 A3 简短回应。',
+    alt:'"积极是指什么？报个班？投简历？还是每天跑步？你挑一个，我今天就做。"' },
+  { id:'A2', sc:'lecture', stage:2, name:'一次说清', kw:[],
+    r:{ g:'这样，我们各自把立场说一遍：你说你的要求，我说我的打算，说完都不重复了，行吗？',
+        b:'我把我的计划告诉你，你有具体补充就提，没有的话这事就按我的来。',
+        f:'我的想法说一次就够了，不会变。你有具体建议随时来，没有就不用再讲道理。' },
+    fit:'同一套说教已经开始第二遍，你需要给对话设一个截止点。',
+    core:'把无限循环的说教压缩成"一次交换"，之后只承认新信息。',
+    why:'约定"只说一次"能显著降低消耗，也给对方留了台阶——她可以继续输出，但你只需要回应"新内容"。',
+    next:'她开始重复旧话 → "这个刚才说过了，有新的吗？"；她给出新信息 → 正常处理。',
+    alt:'"行，你说，我听。说完这轮，我们就翻篇。"' },
+  { id:'A3', sc:'lecture', stage:3, name:'简短回应', kw:[],
+    r:{ g:'嗯，知道了。', b:'有具体建议随时说。', f:'嗯。' },
+    fit:'说教进入第三轮以上，解释只会喂养下一轮。',
+    core:'用最低能量维持在场，不再为形容词辩护。',
+    why:'她已经不需要你的回应内容，只需要你的回应姿态。给姿态、不给内容，说教会自己熄火。',
+    next:'她问"你到底听没听进去" → "听进去了，有具体建议找我"；她升级指责 → 切 B 系列策略。',
+    alt:'"嗯。" "好的。" "记住了。"' },
+  { id:'A4', sc:'lecture', stage:4, name:'礼貌收尾', kw:[],
+    r:{ g:'这些道理我都听过了，我自己会安排。我先去忙了，你歇会儿。',
+        b:'我知道了。这事以后有进展我主动说，今天先这样。',
+        f:'这些话不用再讲了。我自己安排我的生活。' },
+    fit:'一场说教已经完整走完，她还在找新的角度继续。',
+    core:'确认收到、宣布独立执行、结束对话，三步走完。',
+    why:'说教的自然终点不是"她说服你"，而是"你宣布接手"。明确表示"我自己会安排"，就剥夺了说教继续存在的理由。',
+    next:'她说"你就要气死我" → 切情绪施压（E 系列策略）；她真的停下 → 正常结束，不必追补。',
+    alt:'"都记住了。我去忙了，回头聊。"' },
+  { id:'A5', sc:'lecture', stage:1, name:'检验"老经验"', kw:['一代代','老话','古话','人家都','别人家','都是这样','俗话说','我们那时候','年代'],
+    r:{ g:'以前的经验有参考价值，但情况确实不一样了。你觉得哪一条现在还能直接用？我们只聊那条。',
+        b:'哪条经验你现在还在用？说来听听，管用我就参考。',
+        f:'时代不同了，我按现在的条件来判断。' },
+    fit:'她用"人家有钱人家都这样""经验一代代传下来"来压你接受结论。',
+    core:'"代代相传"不是论据。把权威包装拆掉，只检验具体那条经验是否成立。',
+    why:'要求她把"都这样"落到"具体哪一条"，她就得从摆资历切换到讲道理——那是你能正常对话的场地。',
+    next:'她说出具体一条 → 逐条讨论，讨论不动就收；她答不出 → "那这条就先放着"。',
+    alt:'"别人家怎么样我不知道，我只见得到我自己的条件。你说个我够得着的。"' },
+
+  /* ---------- 重复施压 ---------- */
+  { id:'P1', sc:'repetition', stage:1, name:'点破重复', kw:['又说','老是','唠叨','车轱辘话','说这么多','说了这么多','还不听','听不进','听没听','白说了'],
+    r:{ g:'我知道你反复说，是担心我。那我们把话说清楚一次：你到底在担心什么？',
+        b:'这句话不是第一次听了。我的回答也没变过——咱们别再重复了。',
+        f:'这句话你说过很多遍了，我的答案不会变。' },
+    fit:'同一句话、同一个诉求，已经出现三轮以上。',
+    core:'点破"重复"本身，让施压失去"新话题"的伪装。',
+    why:'重复施压靠的是"每次都当新话回应"的默认规则。点破次数，等于修改规则：从第 N 次起，旧话不再自动获得你的完整回应。',
+    next:'她说"我容易吗说这么多" → 切 P5；她真的说出具体担心 → 回到具体讨论，认真回应那一个担心。',
+    alt:'"这话你都说了五遍了。我说多少遍你才会信呢？我也是不会变的。"' },
+  { id:'P2', sc:'repetition', stage:2, name:'立场一次说清', kw:['立场','定下来','说一遍'],
+    r:{ g:'我们各自说一次自己的立场，然后都别再重复了，好吗？我尊重你的担心，但决定我自己做。',
+        b:'这样：你把你的要求完整说一遍，我考虑一周，然后给最终答复。中间不再讨论。',
+        f:'我说过我的答案了。除非情况有变化，否则不再重复讨论。' },
+    fit:'双方立场已经明牌，剩下的全是情绪性重复。',
+    core:'把"无限讨论"改成"有限流程"，给这场拉锯装上终点。',
+    why:'"我考虑一周再答复"既不是屈服也不是硬顶，它给了对方被尊重的感觉，同时把后续的每一轮重复都变成违规。',
+    next:'她接受约定 → 到期认真答复，说到做到；她反悔继续说 → "我们说好只说一遍的"，然后切 A3 简短回应。',
+    alt:'"我考虑三天，周五给你准话。在那之前这个话题休战，行不行？"' },
+  { id:'P3', sc:'repetition', stage:3, name:'不再重复解释', kw:[],
+    r:{ g:'嗯，我都记得。', b:'你的立场我知道，我的你也知道。', f:'我说过了，不再重复。' },
+    fit:'解释过、协商过，她仍在原样复读。',
+    core:'解释的边际效用已经是零，保留回应的最小单位即可。',
+    why:'每一次重新解释，都在暗示"上一次不算数"。停止解释，是让"上次说过了"产生效力的唯一方式。',
+    next:'她问"你就这么狠心" → 切情绪施压（E 系列）；她搬出新理由 → 那是新信息，正常回应。',
+    alt:'"说过了。" "没变化。" "嗯。"' },
+  { id:'P4', sc:'repetition', stage:4, name:'停止循环', kw:['没新内容','翻篇'],
+    r:{ g:'再说下去也没有新内容了。今天先聊点别的吧？你最近睡得怎么样？',
+        b:'这个话题先停。等哪边情况有变化，再捡起来谈。',
+        f:'这个话题我不再回应了。说别的可以。' },
+    fit:'重复已经多到影响你的情绪，再待下去只会更耗。',
+    core:'终止对话循环，但不终止关系——收尾时留一扇正常的门。',
+    why:'结束一场对话不等于输。"不再跟随对方的节奏"本身就是这个产品定义的赢。关键是收尾不带敌意，让她没有新的开战理由。',
+    next:'她强行续话题 → 不接，转手机、起身、回自己房间等物理收尾；她接受 → 主动换个轻松话题落地。',
+    alt:'"这事翻篇了。晚饭想吃什么，我做？"' },
+  { id:'P5', sc:'repetition', stage:2, name:'回应"为你好"', kw:['容易吗','不费劲','辛苦','付出','牺牲','为你好','白操心','好心'],
+    r:{ g:'你的付出我都记着，也领情。但这份好不能变成我必须照做的理由——这两件事是分开的。',
+        b:'我认你的好，也认你的辛苦。可正因为是为我好，才更该由我来定什么对我好。',
+        f:'为我好，就请尊重我的决定。不然这份好我承受不起。' },
+    fit:'她把"我为你付出了这么多"当成你必须服从的凭证。',
+    core:'把"付出"和"服从"拆开：感激归感激，决定归决定。',
+    why:'接受前者的同时拒绝后者，既不否定她的付出（避免引爆），又拒绝了她要的交换逻辑。',
+    next:'她说"白养你了" → 切情绪施压（E 系列）；她问"那你到底想怎样" → 这就是引入具体行动的机会（A1）。',
+    alt:'"你的好我领，一辈子记得。但方向得我自己选，不然走不远。"' },
+  { id:'P6', sc:'repetition', stage:2, name:'回应"想当年"', kw:['当年','你这个年纪','像你这么大','我们那时候','年代','年轻时候'],
+    r:{ g:'你们那时候的经验是真的，但现在的情况也真的不一样。我面对的问题，跟你们的对不上号。',
+        b:'你那套在你那个年代管用，我信。可我所在的年代，规则换了。',
+        f:'那套经验你已经用得很好了。我的生活，我用我的办法。' },
+    fit:'她用"我在你这个年纪的时候……"来论证她比你懂你的人生。',
+    core:'区分"经验有价值"和"经验可以直接套用"。',
+    why:'不否定她的过去（那是她的人生资本），只指出时代变量——这个反驳立场稳，且很难被反扑。',
+    next:'她举例对比 → 挑一个差异最大的变量（物价、婚恋市场、信息渠道）具体说明；她情绪上来 → 切 E 系列。',
+    alt:'"你现在用手机转账，当年你敢吗？时代变了，办法就得跟着换。"' },
+
+  /* ---------- 生活干涉 ---------- */
+  { id:'C1', sc:'life_control', stage:1, name:'宣告决定权', kw:['决定权','我说了算','我的事我做主'],
+    r:{ g:'这件事我有自己的安排。你想建议什么可以直接说，但最后怎么定，得我来。',
+        b:'你的建议我听完了。做不做，我看完情况再答复你。',
+        f:'这是我的事，我来决定。建议可以，安排不行。' },
+    fit:'她对"你应该怎么做"下指令，而不是提建议。',
+    core:'把对话从"指令-服从"改写回"建议-参考"。',
+    why:'第一次就明确决定权归属，成本最低。拖到第三轮再划界，每句话都会被当成谈判。',
+    next:'她给出像样的建议 → 参考并反馈；她坚持"你必须" → 重复一遍边界，然后切 C3 简短回应。',
+    alt:'"建议我收下。执行不执行、怎么执行，我看情况。"' },
+  { id:'C2', sc:'life_control', stage:2, name:'有条件让步', kw:['各退一步','让步'],
+    r:{ g:'我可以试试你说的那部分，但方式我来定，中途不合适我会停。',
+        b:'各退一步：你说的 A 我配合，我要的 B 你也别拦。行就一起推进。',
+        f:'我可以听建议，但不接受安排。这条线不动。' },
+    fit:'她的要求里有一部分确实可取，全盘拒绝不划算。',
+    core:'让步要可逆、有边界，并且让"参考你的建议"看起来是你的决定。',
+    why:'局部合作能换取整体和平，但必须保留退出权——否则让步会被解读成先例。',
+    next:'她得寸进尺加码 → "刚才说好的就这些"；她配合 → 给她正反馈，维持关系账户。',
+    alt:'"按你说的试两周，两周后我告诉你感觉。不合适我就停。"' },
+  { id:'C3', sc:'life_control', stage:3, name:'简短接住', kw:[],
+    r:{ g:'我有数。', b:'先这样。', f:'不用再说了。' },
+    fit:'干涉性指令反复出现，你已划过边界。',
+    core:'最小回应，不重新开庭。',
+    why:'每一次长解释都是把"已决事项"重新变成"待议事项"。短回应维持决定已生效的事实。',
+    next:'她拍桌子讲道理 → 维持短回应或切 A4 收尾；她转向别的事 → 正常交流。',
+    alt:'"嗯。" "我知道了。" "到时看。"' },
+  { id:'C4', sc:'life_control', stage:4, name:'划定边界', kw:['边界','少管','不用管'],
+    r:{ g:'我的生活我自己打理，这件事不用再讨论了。有结果我会告诉你。',
+        b:'这件事到此为止。以后有结果我主动说，你别再问了。',
+        f:'我的边界在这里。越界的话，我就不回应了。' },
+    fit:'她已经反复越过你划的线，温和方案失效。',
+    core:'把边界从"口头约定"升级为"行为规则"：越线有代价。',
+    why:'边界没有后果就不是边界。这里说的代价可以很轻——只是"我不回应"——但必须说到做到。',
+    next:'她测试边界 → 冷处理一次，让她看到代价；她收敛 → 立刻恢复正常交流，给出正反馈。',
+    alt:'"这话我不接了。你想聊点别的我在，想继续这个就到这。"' },
+  { id:'C5', sc:'life_control', stage:2, name:'交友自主', kw:['那种人','来往','断绝','远离','少接触','朋友','闺蜜','闺蜜'],
+    r:{ g:'我交什么朋友，是我自己判断的事。你具体担心哪一点？说人和事，我们看，不下总体结论。',
+        b:'你不喜欢她们可以。但我的朋友，我自己选，我自己负责。',
+        f:'我的朋友不需要批准。这事没有讨论空间。' },
+    fit:'她要求你"离那种人远一点""别和乱七八糟的人来往"。',
+    core:'交友权是自主权的一部分。要讨论的是具体的人和事，不是给整段关系下判决。',
+    why:'要求她把模糊的"那种人"落到具体事件上：说得出来，就事论事；说不出来，就证明那只是她的不安，不是你的问题。',
+    next:'她说出具体事 → 单独评估那件事；她只重复"反正不是好人" → "那就到这，我的朋友我自己看"。这也是"谜底"案例里被验证过的节点：不要顺着"保持距离"谈判。',
+    alt:'"她们怎么样我看得见。真有问题，我自己会处理，不用你提前判刑。"' },
+  { id:'C6', sc:'life_control', stage:1, name:'拆解老话比喻', kw:['古话','老话','俗话说','庭院','迎客','老祖宗','成语'],
+    r:{ g:'这话本身有道理，但放在我这件事上不完全适用，因为情况不一样。我说说差在哪。',
+        b:'比喻是比喻。咱们回到具体的事上，一件事一件事看。',
+        f:'我不接受用比喻给我下结论。有具体问题就说具体问题。' },
+    fit:'她用"打扫好庭院再迎客"这类古话，给你的人生下结论。',
+    core:'古话是修辞，不是论据。它描述的普遍经验，替代不了对你具体处境的分析。',
+    why:'拆比喻不是否定传统文化，是把讨论拉回可检验的地面：你的具体情况，只能用你的具体条件分析。',
+    next:'她坚持"道理都是相通的" → "相通的归相通，我的归我的"；她能说清对应关系 → 认真回应那一点。',
+    alt:'"庭院我一直在扫。客人来不来、什么时候来，我说了算。"' },
+
+  /* ---------- 否定与指责 ---------- */
+  { id:'B1', sc:'criticism', stage:1, name:'区分事实与评价', kw:['下定义','人身攻击','扣帽子'],
+    r:{ g:'你刚才说的是评价，不是事实。我们可以聊聊具体发生了什么，评价就算了。',
+        b:'哪件事让你不满意？说那件具体的事，别给我这个人下定义。',
+        f:'我不接受这个评价。有事说事，没事就到这。' },
+    fit:'她输出"你怎么这么不懂事""你就是个自私的人"这类人身定义。',
+    core:'把战场从"你是什么人"拉回"某件事怎么办"。',
+    why:'人身评价没法辩护——你越解释，越像在承认需要辩护。只接事实层，评价层直接不进入讨论。',
+    next:'她说出具体事件 → 就事论事，该道歉道歉、该说明说明；她坚持定义你这个人 → 重复"有事说事"，然后切 B3。',
+    alt:'「不懂事」这三个字我退回给你。你对我做的哪件事不满意，我们说那件。' },
+  { id:'B2', sc:'criticism', stage:2, name:'对事不对人', kw:['做得不对','对事不对人','这顶帽子'],
+    r:{ g:'那件事如果有做得不妥的地方，我认，也会改。但我这个人，不是你说的那样。',
+        b:'事我可以改。"不懂事"这顶帽子，我不收。',
+        f:'事可以谈，人身评价免谈。这是我的底线。' },
+    fit:'指责里混着一件具体的事和一堆人格攻击。',
+    core:'接住其中合理的部分，同时拒绝人格标签——两个动作要一起做，缺一个都会被整体吞没。',
+    why:'只道歉会强化"骂你有用"；只反驳会显得死不认账。分开处理，既守住自我，又给了台阶。',
+    next:'她收下道歉继续攻击人格 → 回到 B1 拒绝评价；她转向解决问题 → 进入正常讨论。',
+    alt:'"这事我下次注意。但「我这个人不行」这句话，你收回。"' },
+  { id:'B3', sc:'criticism', stage:3, name:'不接指责', kw:[],
+    r:{ g:'嗯，我知道你不满意。', b:'你可以说事。说人的话，我不接。', f:'（不回应指责本身）' },
+    fit:'指责进入复读阶段，内容已经没有新信息。',
+    core:'拒绝成为指责的回音壁。',
+    why:'指责需要你的反应来确认命中。反应最小化，指责就会转向下一个出口。',
+    next:'她问"你哑巴了？" → "我在听，说事就行"；她转而说事 → 正常回应。',
+    alt:'"嗯。" "听到了。" "说事就行。"' },
+  { id:'B4', sc:'criticism', stage:4, name:'暂停对话', kw:[],
+    r:{ g:'你这样说话，我很难继续聊。等你缓一缓，我们再谈，好吗？',
+        b:'今天先到这。改天大家都平静了再谈这件事。',
+        f:'指责的话我不再回应了。今天到此为止。' },
+    fit:'对话已经变成单方面指责的输出，继续只会互相伤害。',
+    core:'先保人，再保话题。人在，话题永远可以重来；人耗尽了，什么都不会剩。',
+    why:'主动喊停不是认输，是拒绝在糟糕的条件下继续谈判。事后在双方平静时复盘，效率远高于当场硬顶。',
+    next:'她追着骂 → 物理离开现场（回房间/出门），不必每次都解释；事后她平静 → 主动找她聊一件别的事，修复关系温度。',
+    alt:'"我先出去走走。晚上回来吃饭。"' },
+  { id:'B5', sc:'criticism', stage:2, name:'回应"你什么态度"', kw:['什么态度','和谁学','这么说话','对家人','刻薄','嘴上不饶人'],
+    r:{ g:'我的态度是针对这件事的，不是针对你这个人。这件事对我很重要，所以我说话直接。',
+        b:'我说话直接，是因为这事对我重要。换成不重要的事，我从来不争。',
+        f:'我不想吵，但我也不会用讨好来结束争论。我们都可以好好说话。' },
+    fit:'她不回应你的观点，转而审判你的态度："张口闭口闭嘴，你对家人就是这种态度？"',
+    core:'这是转移话题——从"事情对不对"变成"你态度好不好"。不要跟着走。',
+    why:'态度审判最容易让人慌着自证。识破它是转移，一句"就事论事"就能把话题领回来。',
+    next:'她继续纠缠态度 → "态度可以慢慢改，但今天这事怎么办？"；她回到事情本身 → 正常推进。',
+    alt:'"我在家里才敢这么说话，因为我知道说你不是不爱。这事咱说事。"' },
+  { id:'B6', sc:'criticism', stage:2, name:'不参与比较', kw:['看看人家','别人家的孩子','人家怎么','你怎么不学学','谁谁谁'],
+    r:{ g:'每个人情况不一样，比较解决不了咱们的问题。咱们说我自己的事。',
+        b:'我也羡慕过别人的父母，后来想明白了：比较只伤人，不解决问题。',
+        f:'我不和任何人比，也不接受被比较。' },
+    fit:'她搬出"别人家的孩子"作为标尺来否定你。',
+    core:'比较的裁判权在你自己手里：你的人生不需要按别人的刻度打分。',
+    why:'顺着比较自证或反驳，都是在承认这套标尺有效。直接否定标尺本身，才是釜底抽薪。',
+    next:'她细化比较（"人家一年挣多少"）→ "那我上哪找一个跟你标准完全一样的我呢？"然后收住；她情绪化 → 切 E 系列。',
+    alt:'"那别人的父母还给孩子买房呢。咱不比这个，比这个没完。"' },
+
+  /* ---------- 情绪施压 ---------- */
+  { id:'E1', sc:'guilt', stage:1, name:'情绪不揽责', kw:['失望','伤心','寒心','难受','痛心'],
+    r:{ g:'我知道你难受，我也在乎。但你的情绪，你自己也要照顾一下，我没法为它负全部责任。',
+        b:'你失望我理解。但失望归失望，我的决定不会因为它改变。',
+        f:'你可以难过。但别用难过，来逼我改变。' },
+    fit:'她用"你太让我失望了""我心寒"来给你的决定定价。',
+    core:'共情她的感受，但不承接"你让妈妈失望"的全部归因。',
+    why:'情绪是真实的，但把情绪的责任全部压给另一个人的选择，是一种施压结构。分开这两件事，才是既善良又有边界的回应。',
+    next:'她升级成"白养你了" → 切 E5；她平静下来聊真实担忧 → 回到具体问题讨论。',
+    alt:'"你难过我心疼。但这件事我是认真想过的，不是故意气你。"' },
+  { id:'E2', sc:'guilt', stage:2, name:'叫停情绪对话', kw:[],
+    r:{ g:'我们都缓一缓。等情绪过去再谈这件事，谈出来的才是真话。',
+        b:'现在谈只会更僵。先停半小时，回头继续。',
+        f:'情绪化的对话我不参与。平静了再叫我。' },
+    fit:'双方情绪都已上头，对话内容开始互相伤害。',
+    core:'在关系受损之前按下暂停键，给情绪留出代谢时间。',
+    why:'上头时的对话，90% 是情绪对流，10% 是信息交换。暂停不是逃避议题，是保护议题。',
+    next:'她接受 → 到点主动回来谈，说到做到；她拒绝暂停 → 你单方面降温：降低音量、放慢语速、减少回应。',
+    alt:'"我出去十分钟。回来我们接着说，但好好说。"' },
+  { id:'E3', sc:'guilt', stage:3, name:'简短陪伴', kw:[],
+    r:{ g:'嗯，我知道你难受。', b:'等你平静了，我们再说。', f:'（简短回应，不辩论）' },
+    fit:'情绪输出阶段，讲道理只会火上浇油。',
+    core:'陪伴姿态 + 零辩论。',
+    why:'情绪里的"道理"都不是道理，是痛感的表达。此时任何逻辑反驳都会被听成攻击。只给存在感，不给论点。',
+    next:'她情绪回落 → 递杯水、换个话题，自然过渡；她要求你当场认错 → "等我们都平静了再说这个"。',
+    alt:'"我在。" "不吵。" "等会儿再说。"' },
+  { id:'E4', sc:'guilt', stage:4, name:'温和收尾', kw:[],
+    r:{ g:'今天先到这里。我都好好的，不用为我担心。',
+        b:'我先去忙了。晚点再联系你。',
+        f:'这个话题今天结束。改天我们聊点开心的。' },
+    fit:'一场情绪风暴基本过去，需要体面落地。',
+    core:'收尾时主动释放善意信号，避免冷战式结尾。',
+    why:'"赢"的定义里包括关系不破裂。收尾留暖意，下次对话才不会从旧怨开场——这正是不想断绝关系、也不想内耗的最优解。',
+    next:'她接受 → 过几小时发条日常消息维持温度；她还在生闷气 → 给她时间，不追问。',
+    alt:'"晚上想吃什么？我买回去。"' },
+  { id:'E5', sc:'guilt', stage:2, name:'回应"都是为了你"', kw:['为了你','还不是','要不是','都怪你','白养','牺牲','耽误'],
+    r:{ g:'我知道你很多选择是为了这个家。但把所有结果都归到我身上，这个账我认不了。',
+        b:'你的付出是你的选择，我尊重它。但它不构成对我人生的要求。',
+        f:'我为自己的选择负责。你的选择，我不负责。' },
+    fit:'她把人生的沉没成本归因于你："要不是为了你，我早就……"',
+    core:'这是"牺牲债"：把她的过去变成你的债务。债不存在，因为无人签过字。',
+    why:'接受一笔"还不清的债"，你就永远失去议价权。温和地拒绝记账，是最早止损的时点。',
+    next:'她列举牺牲清单 → 承认事实、拒绝归因："这些都辛苦，但那是当时的选择"；她哭 → 切 E3 简短陪伴。',
+    alt:'"你为我做的，我都记得，也会对你好。但那笔账不能这么算——它算不清，也会把咱们算成仇人。"' },
+
+  /* ---------- 通用兜底（无法识别情境时） ---------- */
+  { id:'GEN01', sc:null, stage:0, name:'通用回应', kw:[],
+    r:{ g:'嗯，你说的我听到了。这件事我会自己考虑和安排，有进展再跟你说。',
+        b:'我的想法你已经知道了，我的安排也是。先这样。',
+        f:'这件事我自己处理。咱们先聊点别的。' },
+    fit:'她的这句话暂时没匹配到具体情境，先用通用方式接住，不让场面僵住。',
+    core:'稳住对话节奏，等她的下一句暴露真实议题。',
+    why:'语料和规则都没命中时，硬猜情境不如稳妥接话。下一轮通常就能识别出具体情境，届时自动换用针对性策略。',
+    next:'看她下一句的内容：出现催婚、说教、指责等关键词时，会自动切换到对应情境策略。',
+    alt:'"嗯，我知道了。"' },
+];
+
+/* =====================================================
+   外部语料库 v1.0（耳根清净_规则语料库 合入）
+   60 策略 / 240 原话 / 301 关键词 / 48 分支 / 10 原则
+   ===================================================== */
+var CORPUS = {"units":[{"id":"C-MAR01","sc":"marriage","stage":1,"name":"承认关心，保留自己的节奏","kw":["找对象","谈恋爱","怎么还没对象","单身","抓紧找"],"r":{"g":"我知道你会关心这个问题。我也会认真对待自己的感情，只是想按自己的节奏来。","b":"我有在考虑，不会因为暂时单身就放弃自己的生活。感情的事我会自己安排。","f":"我的感情生活由我自己决定。如果有进展，我愿意主动告诉你；暂时不想反复讨论。"},"fit":"对方询问为什么没有对象或催促开始恋爱","why":"回应对方关心的主题，但不把“现在没有对象”解释成自己的缺陷，也不承诺立刻改变。","next":"如果对方继续追问时间表，可重复“我会自己安排，有进展会告诉你”，不必编造日期。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你怎么还不谈恋爱？","你身边就没有合适的人吗？","你总一个人，什么时候才能有对象？","你也该主动一点了。"]},{"id":"C-MAR02","sc":"marriage","stage":2,"name":"把年龄焦虑转成具体问题","kw":["年纪","年龄","再不结婚","来不及","黄金年龄"],"r":{"g":"我知道你担心时间。不过我更在意关系是否合适。你最担心的具体是什么？","b":"年龄是一个因素，但不是我选择伴侣的唯一标准。我会把合适和相处质量一起考虑。","f":"我理解你着急，但我不会只因为年龄压力就进入一段不合适的关系。"},"fit":"对方反复用年龄、错过机会施压","why":"把泛化的年龄焦虑拉回具体担忧，或明确自己选择伴侣的标准。","next":"如果对方说“你以后会后悔”，可以回答“可能性我会考虑，但决定仍要由我自己做”。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你都这么大了，再拖就来不及了。","女孩子年龄很重要，你自己要有数。","等你年纪更大就没人要了。","你现在条件好，别把时间浪费了。"]},{"id":"C-MAR03","sc":"marriage","stage":1,"name":"把介绍对象变成可执行安排","kw":["介绍对象","相亲","给你找","帮你物色","安排见面"],"r":{"g":"好呀，如果你有合适的人选，可以把基本情况告诉我，我们再看要不要认识。","b":"可以。如果有具体人选，麻烦你把对方的情况和联系方式发我，我会自己判断是否合适。","f":"介绍可以，但见不见、是否继续接触，我会自己决定。我们先有具体人选再讨论。"},"fit":"对方表示可以介绍对象，却继续泛泛催促","why":"当对方提出“我会帮你”时，询问下一步的具体安排，避免对话继续停留在空泛承诺。","next":"若对方转而要求你先改变生活，可把两个议题分开：“介绍对象这件事可以具体推进，其他生活安排我会自己处理”。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我让你姨给你介绍，你自己也要上心。","你先把自己状态调整好，人家才愿意接触你。","我认识一些条件不错的人，以后给你看看。","你别光说不行动，我会帮你留意的。"]},{"id":"C-MAR04","sc":"marriage","stage":3,"name":"不接受以婚姻标准评价自己","kw":["没人要","嫁出去","娶进门","条件","剩下"],"r":{"g":"我知道你有自己的婚姻观，但我对幸福的理解不完全一样。我会认真选择。","b":"有没有伴侣不能直接说明一个人过得好不好。我会为自己的生活负责。","f":"我不接受用有没有结婚来评价我的价值。这个话题如果一直变成评价，我就先不聊了。"},"fit":"对方把婚姻状态等同于价值、成功或幸福","why":"将讨论从“我值不值得被喜欢”拉回“我如何选择生活”，不进入自我价值辩护。","next":"如果对方愿意谈实际担忧，可继续；如果只重复贬低，转入S4结束话题。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你这样下去谁会喜欢你？","一个人怎么会幸福？","你条件也不差，怎么就不抓紧？","女人最终还是要有个归宿。"]},{"id":"C-MAR05","sc":"marriage","stage":3,"name":"回应催促但不交出决定权","kw":["什么时候结婚","给个准话","必须结婚","听我们的","条件要好"],"r":{"g":"我理解你希望事情有个着落，但我现在不能给一个不确定的时间承诺。","b":"我会认真考虑关系问题，但不会预先承诺结婚时间或接受某一套择偶标准。","f":"我不会为了让你安心而作不真实的承诺。我的感情决定由我自己承担。"},"fit":"对方要求马上行动、承诺期限或按父母标准择偶","why":"避免用虚假保证换取短暂安静；明确自己愿意考虑什么、不愿承诺什么。","next":"如果对方继续要求保证，重复一次边界即可，不需要不断补充理由。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你到底什么时候结婚，给个准话。","你就按我说的标准找，别自己瞎挑。","这件事你必须听我们的。","你先答应我们会认真相亲。"]},{"id":"C-REL01","sc":"relationship","stage":1,"name":"把价值争论转回相处与生活","kw":["同性恋","女朋友","男朋友","不正常","找个男人","找个女人"],"r":{"g":"我知道你对这件事有不同看法，但这段关系对我很重要。我希望我们先具体谈谈你最担心什么。","b":"我的伴侣选择是我认真考虑后的决定。你可以有疑问，但我希望你不要用“不正常”来评价我。","f":"我不会为了让你接受而否认自己的感情。如果你愿意平静交流，我们可以继续谈；如果是羞辱，我会暂停。"},"fit":"父母否定同性关系或不认可伴侣","why":"把对方的笼统否定转成可讨论的具体担忧，同时不把自己的身份或感情交给对方裁决。","next":"若对方提出现实担忧，可逐项讨论；若只重复羞辱或威胁，优先保护安全并暂停对话。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你怎么能喜欢同性？","你还是找个男人结婚吧。","你现在这个女朋友不算数。","你以后就知道正常家庭多重要了。"]},{"id":"C-REL02","sc":"relationship","stage":2,"name":"区分担忧与要求改变","kw":["为你好","分手","断掉联系","别再来往","你会后悔"],"r":{"g":"我听到了你的担心。你可以告诉我你具体担心哪件事，我会认真判断，但不会因为一句“为你好”就立刻分手。","b":"如果你有具体顾虑，我们可以谈事实和风险；是否结束关系，需要由我自己决定。","f":"我不会把分手当作安抚你的承诺。你可以表达意见，但不能替我决定关系。"},"fit":"父母声称为你好，要求结束现有关系","why":"让“为你好”落到具体担忧上，区分建议和命令。","next":"如果父母给出具体、可验证的风险信息，可以认真核实；不要为了反抗而忽略真实风险。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我都是为你好，你赶紧和她分开。","我不可能同意你们继续在一起。","你现在不分手，以后受苦的是你。","你先把这段关系断了再说。"]},{"id":"C-REL03","sc":"relationship","stage":3,"name":"不被带入对未来的灾难化想象","kw":["老了怎么办","没人陪你","以后后悔","社会怎么看","孤独终老"],"r":{"g":"未来确实有很多要考虑的事，我会逐步安排。我们可以讨论具体的生活保障，不必先假设结局一定很糟。","b":"养老、陪伴和生活保障都可以提前规划，但它们不能直接决定我现在应该和谁在一起。","f":"我愿意考虑未来的现实问题，但不接受用最坏的想象来否定我的关系。"},"fit":"父母用孤独、养老、社会眼光预测糟糕未来","why":"把灾难化预测拆成可规划的问题，避免陷入“证明未来一定幸福”的争论。","next":"可把话题拆为经济、养老、支持网络等实际议题；不要承诺未来绝不会遇到困难。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你老了谁照顾你？","以后没有孩子，你就知道苦了。","别人会怎么看你们？","你现在开心，以后就等着后悔吧。"]},{"id":"C-REL04","sc":"relationship","stage":2,"name":"面对“这只是阶段”不反复自证","kw":["一时冲动","阶段","长大就好了","被带坏","想清楚"],"r":{"g":"我理解你可能需要时间接受，但这不是我随口做的决定。我希望你先听我把自己的想法说完。","b":"我已经认真想过这件事，不需要每次都重新证明。你可以慢慢理解，但请尊重我现在的表达。","f":"你可以暂时不理解，但请不要替我定义我的感情或经历。"},"fit":"父母将用户的关系或身份说成一时冲动","why":"说明自己经过思考，同时避免陷入无限举证，给对方保留理解所需时间。","next":"若对方愿意倾听，可以谈具体经历；若只是反复否认，缩短解释并设定边界。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你只是现在想法不成熟。","等你再长大一点就会变了。","肯定是身边的人影响你。","你再想想，别这么早下结论。"]},{"id":"C-REL05","sc":"relationship","stage":4,"name":"处理隐瞒、公开与家庭场合压力","kw":["别带回来","别告诉亲戚","丢人","不能公开","不要让人知道"],"r":{"g":"我知道你担心亲友的反应。我们可以讨论什么场合适合谈、怎么介绍，但我不希望这件事总被当成羞耻。","b":"公开到什么程度可以商量，但我不接受用“丢人”来定义我的关系。我们可以先讨论具体场合。","f":"我会考虑现实环境和安全，但不会承诺永远隐瞒。涉及我的关系，最终需要尊重我的决定。"},"fit":"父母要求隐藏伴侣、避免带回家或担心亲友议论","why":"区分隐私管理、家庭协商和羞辱性要求；不强迫用户立刻公开，也不要求其永远隐瞒。","next":"若用户可能因公开关系遭遇暴力、失去住所或经济支持，应优先评估安全与现实依赖。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你们的事别带回家，亲戚问起来我怎么说？","不要在外面说这些，太丢人了。","过年不许带她回来。","你自己知道就行，别让别人知道。"]},{"id":"C-JOB01","sc":"career","stage":1,"name":"把稳定焦虑转成个人决策条件","kw":["稳定","编制","铁饭碗","大公司","别折腾"],"r":{"g":"我知道你看重稳定。对我来说，收入、成长、城市和工作方式也都重要，我会一起权衡。","b":"我会把稳定性纳入选择，但不会只用一个标准决定工作。我们可以具体比较收入、发展和风险。","f":"我理解你希望我少走弯路，但职业选择由我负责。我会按自己的条件做决定。"},"fit":"父母只强调稳定、编制或大公司","why":"承认稳定是一个因素，但把选择标准重新展开，避免陷入“稳定对不对”的抽象争论。","next":"如果对方愿意讨论，可列出具体条件；如果只是重复“稳定最重要”，进入简短回应阶段。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["找工作还是稳定最重要。","你就考个编制，别再折腾了。","小公司不靠谱，还是进大厂。","工作不用喜欢，能干一辈子就行。"]},{"id":"C-JOB02","sc":"career","stage":2,"name":"把“你要努力”变成具体支持","kw":["努力","准备","拖延","不够上进","你早该"],"r":{"g":"我知道现在确实有需要补上的地方。我正在处理眼前的任务，接下来会按优先级推进。","b":"回头看可以总结经验，但反复说我早该做什么并不能推进现在的事情。如果你有具体建议，可以告诉我。","f":"我会承担自己的选择和结果，但不想继续用指责代替解决问题。"},"fit":"父母指责准备不足、拖延或不够上进","why":"承认现实中可改进的部分，但把注意力转向下一步行动，避免陷入反复追责。","next":"若用户确实需要帮助，可提出具体请求，如简历反馈、信息搜集或时间安排；不必假装已经完成。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你早就应该准备了，现在着急有什么用？","你就是不够努力。","我早跟你说了，你不听。","你要是早点准备，现在就不会这样。"]},{"id":"C-JOB03","sc":"career","stage":2,"name":"回应薪资与职业选择的比较","kw":["工资太低","没前途","挣不到钱","别人都比你强","有什么用"],"r":{"g":"我也会考虑收入和发展。现在的选择只是一个阶段，我会结合经验积累和后续机会判断。","b":"收入是重要指标，但还需要看岗位成长、行业前景和生活成本。我会综合比较。","f":"我愿意讨论实际收入和规划，但不希望用别人的工资直接否定我的选择。"},"fit":"父母认为薪资不够、工作没前途","why":"把薪资问题从人格评价转为可比较的职业条件。","next":"如果对方担心经济独立，可讨论预算与成长路径；避免空泛保证未来一定高薪。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你读这么多年书，就拿这点工资？","这个工作有什么前途？","你看看别人家的孩子工资多少。","做这个能养活自己吗？"]},{"id":"C-JOB04","sc":"career","stage":3,"name":"不让亲戚比较决定自己的路","kw":["某某家的孩子","同学都","别人早就","你怎么比不过","同龄人"],"r":{"g":"每个人的条件和选择不一样。我会参考别人的经验，但不会直接照搬别人的人生。","b":"比较可以提供信息，但不能替我做决定。我们还是看我现在具体需要解决什么。","f":"我不想继续拿亲戚朋友做比较。如果有具体建议，我们可以谈具体建议。"},"fit":"父母用亲戚同学的工作、学历、婚姻来施压","why":"不进入输赢比较，把注意力拉回个人条件和当前任务。","next":"若对方举出可借鉴的具体经验，可以讨论方法；只比较身份和结果时不必自证。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你看你表姐，早就进大公司了。","你同学都买房了，你还在干什么？","别人都能做到，你为什么不行？","你就不能学学人家吗？"]},{"id":"C-JOB05","sc":"career","stage":3,"name":"对未经请求的职业指导设限","kw":["我给你安排","听我的","你不懂","我认识人","照我说的做"],"r":{"g":"谢谢你替我考虑。你可以把信息发给我，我会了解后自己判断是否适合。","b":"我愿意参考你提供的信息，但是否接受、是否去面试，需要由我自己决定。","f":"你可以帮我提供机会，但不能替我做职业决定。我会对自己的选择负责。"},"fit":"父母不断给建议、要求按其路径行动","why":"区分资源支持与决定权，既不否定帮助，也不默认接受安排。","next":"如果涉及经济依赖或家庭资源，可明确谈清楚条件与后果，再决定是否接受。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我都给你想好了，你照做就行。","你没经验，听我的不会错。","我托人给你找了工作，你必须去。","我都是过来人，你别自己做主。"]},{"id":"C-LIF01","sc":"life_control","stage":1,"name":"对朋友选择保留自主权","kw":["别和她来往","交朋友","狐朋狗友","影响你","不三不四"],"r":{"g":"如果你看到具体让你担心的地方，可以告诉我，我会自己判断这段关系是否合适。","b":"你可以表达看法，但我会根据实际相处来决定和谁交往。","f":"我的朋友由我自己选择。如果你有具体事情可以谈，不接受笼统地要求我断交。"},"fit":"父母干涉交友或要求远离某个人","why":"将泛化标签转为具体事实，同时保留成年人的交友决定权。","next":"如果对方指出真实伤害或风险，认真核实；边界不等于拒绝所有反馈。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你别再和那个人来往了。","我看你那些朋友都不靠谱。","和他们在一起能有什么好处？","你把朋友看得比家里还重要。"]},{"id":"C-LIF02","sc":"life_control","stage":2,"name":"把生活指令转成可协商事项","kw":["几点睡","几点起","必须回家","每天汇报","怎么安排"],"r":{"g":"我知道你担心我的生活状态。我会安排好自己的作息，也会在有需要时告诉你。","b":"我的日常安排我会自己管理。涉及共同安排的部分，我们可以提前商量。","f":"我已经成年了，日常时间由我自己决定。我们可以沟通，但不需要逐项报备。"},"fit":"父母要求按自己的时间表或生活习惯安排","why":"区分共同生活需要协调的事项与个人生活管理权。","next":"若仍与父母同住，可把边界具体化为共同空间、费用、安静时间等可协商规则。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你每天必须几点睡觉。","你出去要提前告诉我去哪、和谁。","我说了你就照做，别问为什么。","你自己的生活怎么能安排成这样？"]},{"id":"C-LIF03","sc":"life_control","stage":1,"name":"回应外貌与身体评价","kw":["胖瘦","穿衣服","打扮","头发","不好看"],"r":{"g":"我知道你有自己的审美，不过我现在这样穿是我自己的选择。","b":"如果是健康问题可以具体谈，但外貌和穿衣我会按自己的喜好决定。","f":"我不想继续讨论我的身材或外貌。我们换个话题吧。"},"fit":"父母批评体重、穿着、发型或身体状态","why":"把身体健康与审美评价分开，不必把外貌决定权交出去。","next":"若对方谈的是明确健康指标，可选择咨询专业人士，而不是在家庭争论中处理。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你怎么又穿成这样？","你是不是胖了，得减肥了。","女孩子要注意形象。","你这个发型别人会怎么想？"]},{"id":"C-LIF04","sc":"life_control","stage":2,"name":"对城市与居住选择说明考虑因素","kw":["回老家","留在身边","去哪里工作","离家太远","搬回来"],"r":{"g":"我知道距离会让你担心。我会把工作机会、生活成本和未来安排一起考虑。","b":"住在哪里需要综合考虑职业、经济和生活需求。我会认真规划，也会保持联系。","f":"我理解你不舍得，但居住和工作地点需要由我决定。我们可以讨论如何保持联系。"},"fit":"父母要求回老家、留在身边或搬到指定城市","why":"承认分离带来的感受，但不把父母的不舍自动转化成自己的义务。","next":"如果父母确实需要照护，可具体讨论照护安排与资源，而不是只围绕“必须回来”争论。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你毕业了就回来，别在外面漂。","家里又不是没有地方，为什么非要搬出去？","你去那么远，我们怎么办？","我不想你留在外地。"]},{"id":"C-LIF05","sc":"life_control","stage":3,"name":"对未经同意的决定重新划界","kw":["我已经替你答应","我帮你决定","不用问你","我都安排好了","你必须去"],"r":{"g":"谢谢你想着我，不过涉及我的时间和选择，下次先问过我会更方便。","b":"这次我先确认一下安排是否合适。以后涉及我的事情，请先问我，再替我答应别人。","f":"我不会默认接受未经我同意的安排。你可以提出建议，但请不要替我作决定。"},"fit":"父母替用户答应亲戚、安排相亲、购买物品或作出承诺","why":"清楚区分好意与授权，建立可重复使用的事前确认规则。","next":"如果已经产生实际费用或承诺，可以协商如何处理，但不因此放弃今后的边界。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我已经替你答应亲戚周末回去了。","我都帮你安排好了，你到时候去就行。","这有什么好问你的，我是你妈。","我已经替你报了名，你不要浪费我的心意。"]},{"id":"C-LECT01","sc":"lecture","stage":1,"name":"追问具体做法","kw":["积极一点","努力一点","上进","要主动","态度"],"r":{"g":"我知道你的意思。那如果落到现在这件事上，你觉得我可以先做哪一步？","b":"方向我明白了，可以说得具体一点吗？你建议我下一步做什么？","f":"如果只是说要积极，我暂时不知道怎么落实。有具体建议时我们再聊。"},"fit":"父母只说积极、努力、上进，却没有具体建议","why":"把抽象价值判断转化为具体行动，测试对方是否愿意进入解决问题的层面。","next":"若对方能给出具体建议，可讨论可行性；若反复抽象化，可切换到LECT04或重复说教策略。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你要积极一点。","你现在就是不够上心。","人还是要有点追求。","你态度端正了，事情自然就成了。"]},{"id":"C-LECT02","sc":"lecture","stage":1,"name":"确认对方是否想一起解决问题","kw":["你听我说","我的感悟","经验传下去","我告诉你怎么办","你要体会"],"r":{"g":"我愿意听你说。你是希望我们一起想一个具体办法，还是先把你的想法说完？","b":"我听到了你的看法。你希望我接下来具体做什么？","f":"如果今天只是分享观点，我知道了；如果要解决问题，我们就谈具体步骤。"},"fit":"父母持续讲道理，用户不清楚对方是否愿意解决实际问题","why":"明确对话目标，减少把倾听、接受观点和执行要求混为一谈。","next":"不要把这个问题用作审讯；若对方只是想表达，可以选择听一会儿后结束。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你先听我把话说完。","我是在跟你分享人生经验。","人家有钱人都是这样做的。","这些道理你以后自然就懂了。"]},{"id":"C-LECT03","sc":"lecture","stage":2,"name":"把人生经验变成可验证建议","kw":["我当年","过来人","听我的没错","以前都是","经验"],"r":{"g":"你的经历我愿意参考，但我的条件和时代不完全一样。你觉得其中哪一步最适合我现在的情况？","b":"我知道你有经验。我会参考，但也需要结合我的处境判断。你能举一个具体例子吗？","f":"你的经验对你有用，不代表每一步都适合我。我会自己判断怎么借鉴。"},"fit":"父母用自己过去的经历要求用户照搬","why":"承认经验价值，同时避免将经验直接当作必须服从的命令。","next":"如果建议有实际价值，可以吸收；目标不是为了反对而反对。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我当年就是这么过来的。","我吃过的盐比你吃过的饭还多。","你现在不听，早晚会吃亏。","过来人的话你得记住。"]},{"id":"C-LECT04","sc":"lecture","stage":3,"name":"低投入回应抽象话语","kw":["积极阳光","格局","格局打开","要有眼界","说起来容易"],"r":{"g":"嗯，我会认真想想，也会一步一步把自己的生活安排好。","b":"收到，我会把这些建议放在心上，结合自己的情况慢慢落实。","f":"好，我知道你的意思了。具体怎么做，我会根据实际情况安排。"},"fit":"对方反复使用大道理、成语或空泛要求，无法具体化","why":"当对方停留在抽象层面时，不必用更长的论证回应；低投入表达可以减少消耗。","next":"这不是必须使用的讽刺话术；如果用户感到不舒服，可以直接结束话题。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["做人要有格局。","你要积极阳光一点。","路都是自己走出来的。","你要把眼光放长远，别只看眼前。"]},{"id":"C-LECT05","sc":"lecture","stage":2,"name":"把“你要懂事”拆成具体期待","kw":["懂事","成熟一点","顾全大局","别任性","让着点"],"r":{"g":"我愿意考虑别人的感受。你具体希望我在哪件事上做出调整？","b":"“懂事”对每个人的理解不一样。我们可以谈具体行为，而不是只给我下评价。","f":"我愿意承担自己的责任，但不代表所有事情都要由我让步。"},"fit":"父母用懂事、成熟、顾全大局等词要求服从","why":"把人格要求转成可讨论的行为和责任分配。","next":"如果确实存在用户需要承担的责任，可以就具体行为道歉或调整，不必接受整体人格否定。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你都这么大了，应该懂事。","成熟的人不会像你这样。","你就不能顾全大局吗？","一家人之间不要这么计较。"]},{"id":"C-REP01","sc":"repetition","stage":3,"name":"重复边界，不增加解释","kw":["我再说一遍","你怎么不明白","说了多少次","听进去没有","反复讲"],"r":{"g":"我听明白你的意思了，也会考虑。我们现在只是看法不同，不需要再重复一遍。","b":"这件事我已经听到了。我的考虑也说过了，先到这里吧。","f":"我不准备继续重复解释了。我的决定暂时不变，我们换个话题。"},"fit":"同一观点反复出现，用户已经回答过","why":"采用平静重复的方式维持边界，不因对方重复而不断增加辩解。","next":"若对方提出新信息，可以重新讨论；只有重复原观点时才使用。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我跟你说了多少遍了？","你怎么还是不明白我的意思？","我再跟你强调一次。","你到底听进去没有？"]},{"id":"C-REP02","sc":"repetition","stage":3,"name":"回应“你不听话”的评价","kw":["不听话","不听我的","白说了","你根本没听","犟"],"r":{"g":"我听到了，也理解你的建议。听见不等于一定照做，我还需要结合自己的情况判断。","b":"我有认真听，只是最终选择可能和你不同。","f":"我不会把服从当作听取意见的唯一证明。你可以提建议，但决定由我来做。"},"fit":"对方把不同意建议解释为不听话","why":"区分倾听与服从，避免为了证明自己听了而被迫接受建议。","next":"如果用户确实没有听清，可以先复述对方观点，再说明自己的不同判断。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我说这么多，你一句都不听。","你怎么这么犟？","你要是听我的早就好了。","我说的话你什么时候真正听过？"]},{"id":"C-REP03","sc":"repetition","stage":3,"name":"处理连续电话与消息轰炸","kw":["一直打电话","连发消息","为什么不回","接电话","轰炸"],"r":{"g":"我刚才在忙，没有办法一直看手机。看到后会回复，急事可以在消息开头说明。","b":"我不会一直在线。看到消息我会在方便时回复，不代表我不在乎你。","f":"连续打电话不会让我更快处理。除非有紧急情况，请先发一条消息说明。"},"fit":"父母短时间连续发消息、打电话追问同一件事","why":"建立可执行的联系规则，降低持续打断生活的频率。","next":"若父母有真实紧急情况或照护需求，应共同约定紧急联络方式。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我给你打这么多电话你为什么不接？","你怎么一直不回消息？","我发了这么多条你看见没有？","你现在必须给我回电话。"]},{"id":"C-REP04","sc":"repetition","stage":4,"name":"面对“我不说了”不追着争输赢","kw":["我不说了","随便你","我懒得管","以后不管你","爱怎样怎样"],"r":{"g":"好，我们先不聊这个了。等大家都不烦的时候，再聊别的也可以。","b":"那今天先到这里。这个问题以后如果有具体内容，我们再谈。","f":"可以先停下来。我不会为了让你继续说而改变自己的决定。"},"fit":"父母以停止说话、委屈或反讽结束对话","why":"不追着证明自己，也不急着安抚对方到撤回边界；给双方暂停空间。","next":"若用户希望修复关系，可稍后主动聊日常话题，但不必因此认错或承诺服从。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["行，我以后再也不管你了。","随便你吧，我说什么都没用。","我不说了，反正你也不听。","你爱怎样就怎样。"]},{"id":"C-REP05","sc":"repetition","stage":3,"name":"识别话题循环并切换模式","kw":["又说这个","说来说去","每次都这样","绕回来","讲不完"],"r":{"g":"我发现我们又回到同一个问题了。我的想法已经说过，今天先不重复讨论。","b":"我们已经谈过这个问题，暂时没有新的信息。先停一下吧。","f":"如果谈话一直循环，我会结束这次讨论。等有新情况再聊。"},"fit":"对话不断回到同一主题，用户每次都重新解释","why":"帮助用户识别循环而非不断追加论证，允许结束当次交流。","next":"如果确实出现新事实或实际变化，应重新评估，而不是机械拒绝所有讨论。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我们每次聊到最后还是这个问题。","你不把这件事解决，我就会一直说。","我今天必须把这个道理跟你讲清楚。","你每次都转移话题。"]},{"id":"C-CRI01","sc":"criticism","stage":1,"name":"将人格攻击拉回具体行为","kw":["自私","不懂事","没良心","白眼狼","没出息"],"r":{"g":"如果我具体哪件事让你不舒服，可以告诉我，我们谈那件事。","b":"我愿意讨论我的具体行为，但不想用“自私”这样的标签来谈问题。","f":"你可以指出具体问题，但请不要用人格评价来和我交流。否则我先暂停。"},"fit":"父母使用自私、不懂事等标签","why":"把整体人格标签转回可核实的行为，避免陷入“我是不是坏孩子”的自证。","next":"若用户确实做错某件具体事，可以承认行为责任，同时拒绝整体贬低。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你怎么这么自私？","你真是越来越不懂事了。","我白养你这么多年。","你现在怎么变成这样了？"]},{"id":"C-CRI02","sc":"criticism","stage":2,"name":"面对同龄人比较","kw":["别人家的孩子","表姐","同学","人家怎么","比不过"],"r":{"g":"我可以参考别人的做法，但每个人的条件不一样。我会看自己下一步能做什么。","b":"比较结果对解决我的问题帮助有限。如果有具体经验值得借鉴，我们可以聊方法。","f":"我不想继续比较谁更好。请直接告诉我你希望我具体改进哪件事。"},"fit":"父母拿同学、亲戚或朋友比较","why":"把比较转化为可借鉴的信息，拒绝把比较当作价值裁决。","next":"不要将所有比较都视为恶意；有具体可学习的经验时可以提取有用部分。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你看人家工作多好。","你表姐都结婚买房了。","同样是读书，人家怎么就比你强？","别人能做到，你怎么不行？"]},{"id":"C-CRI03","sc":"criticism","stage":3,"name":"不接受“太敏感”的否认","kw":["太敏感","想太多","开不起玩笑","玻璃心","至于吗"],"r":{"g":"你可能觉得这没什么，但我确实会不舒服。我们可以换一种说法。","b":"你可以不认同我的感受，但这不代表感受不存在。请不要继续用这个方式开玩笑。","f":"我已经说了这让我不舒服。如果继续这样说，我会先结束这段对话。"},"fit":"父母否定用户的感受，称其想太多或开不起玩笑","why":"承认感受是自己的体验，同时提出可执行的沟通请求。","next":"不必证明自己“有资格”不舒服；如果对方愿意调整，可以继续交流。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我就说你两句，你至于吗？","你怎么这么敏感？","我开个玩笑你也生气。","你就是想太多了。"]},{"id":"C-CRI04","sc":"criticism","stage":2,"name":"回应对能力与前途的否定","kw":["你做不到","没能力","没前途","不现实","你能成什么"],"r":{"g":"你可以提醒我风险，但我希望我们谈具体条件和需要补足的能力，而不是直接下结论。","b":"这件事有风险，我会评估。你如果有具体依据，可以告诉我；笼统否定帮不了我判断。","f":"我会自己评估能不能做，也会承担结果。我不想继续听人格层面的否定。"},"fit":"父母断言用户做不到、没能力、没前途","why":"把笼统结论转为具体风险和条件，保留评估空间。","next":"不需要为了反抗否定而忽视客观风险；可把风险拆解成可检验事项。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你根本没有这个能力。","你想得太美了，肯定做不成。","你这点本事能干什么？","别折腾了，你没有那个命。"]},{"id":"C-CRI05","sc":"criticism","stage":3,"name":"面对语气指责不偏离主题","kw":["你什么态度","怎么说话","刻薄","没大没小","顶嘴"],"r":{"g":"我可以注意语气，但我想表达的事情也希望能被听见。我们能不能先谈事情本身？","b":"如果我的语气让你不舒服，我可以调整；但这不代表原本的问题就不用谈。","f":"我们可以之后讨论说话方式，但请不要用态度问题替代正在讨论的事情。"},"fit":"父母不回应内容，转而批评用户态度或说话方式","why":"在必要时承认表达方式可调整，同时避免原议题被完全转移。","next":"若双方都已激动，暂停比强行把所有问题一次说清更合适。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你就不能好好说话吗？","你现在是什么态度？","你跟谁学得这么刻薄？","长辈说你两句还不行了？"]},{"id":"C-GUILT01","sc":"guilt","stage":1,"name":"承认关心，不接受“为你好”作为终止讨论的理由","kw":["为你好","替你着想","都是为了你","不领情","好心"],"r":{"g":"我知道你希望我好，也谢谢你的关心。具体怎么做，我还需要结合自己的想法判断。","b":"我相信你有你的考虑，但“为我好”不代表每个建议都适合我。我们可以谈具体内容。","f":"我听到了你的好意，但最终决定仍需要由我自己做。"},"fit":"父母用为你好要求服从","why":"区分关心的动机与建议是否适合，避免只能在“感恩/不孝”之间二选一。","next":"如果对方的建议确实有帮助，可以接受其中部分，不必全盘接受或全盘否定。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我做这一切都是为你好。","我这么替你着想，你还不领情。","我还能害你吗？","我说这些都是因为我关心你。"]},{"id":"C-GUILT02","sc":"guilt","stage":2,"name":"回应父母付出但不形成无限欠债","kw":["养你","付出","牺牲","欠我的","白养"],"r":{"g":"我知道你们为我付出过很多，这些我没有否认。但感谢你们和由我决定自己的人生，是可以同时存在的。","b":"我感激你们的付出，也愿意在能力范围内承担责任；但这不意味着所有人生选择都必须照你们的安排。","f":"我不会否认你们的付出，但我也不能用一生的决定来偿还一笔没有边界的债。"},"fit":"父母列举养育付出要求按其意愿生活","why":"承认付出与维护自主权可以并存，避免陷入无法偿还的道德账本。","next":"涉及具体经济支持或照护责任时，尽量把责任、能力和安排说具体。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我为你付出这么多，你就这样回报我？","我为了你什么都舍得，你却不听话。","我辛辛苦苦把你养大容易吗？","你欠我们的太多了。"]},{"id":"C-GUILT03","sc":"guilt","stage":3,"name":"不把父母失望全部揽到自己身上","kw":["让我失望","伤我的心","我很难过","你气死我了","心寒"],"r":{"g":"我听到你很失望，也不希望我们这样难受。但我们可能对这件事有不同看法。","b":"我理解你不满意，但我不能为了消除你的失望就改变一个自己认为重要的决定。","f":"你的感受我听到了，但我不会把让你不失望当作唯一的决策标准。"},"fit":"父母说用户让自己失望、伤心或难过","why":"对情绪作回应，但不承诺负责消除对方所有不舒服的感受。","next":"如果用户确实伤害了对方，可以为具体行为道歉；不需要为所有意见分歧道歉。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你真的太让我失望了。","你这样做让我心都凉了。","我辛苦这么多年，最后被你气成这样。","你就不能让我省点心吗？"]},{"id":"C-GUILT04","sc":"guilt","stage":2,"name":"回应父母担心但不接受灾难化责任","kw":["睡不着","担心死了","身体不好","让我操心","我都是被你气的"],"r":{"g":"我知道你会担心，我也会尽量把自己的情况安排好。我们可以约定一个合理的联系频率。","b":"我愿意告诉你必要的近况，但我无法保证你完全不担心，也不能把所有担心都通过服从来解决。","f":"我会为自己的安全和生活负责，但不能以满足所有担忧作为前提。"},"fit":"父母以担心、睡不好、身体受影响要求服从","why":"把抽象担心转化为可协商的联系和信息安排，不把担忧等同于控制权。","next":"如果父母有真实健康或照护需求，应具体协商支持安排，而不是仅争论谁让谁担心。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你这样让我每天都睡不好。","我担心得饭都吃不下。","我身体这么差，你还让我操心。","你什么时候才能让我放心？"]},{"id":"C-GUILT05","sc":"guilt","stage":3,"name":"不被“等你当父母就懂了”堵住嘴","kw":["等你当妈","你以后就懂","养孩子","轮到你","不懂父母"],"r":{"g":"也许以后我会有新的理解，但现在我也有自己的感受和判断。","b":"未来可能改变我的看法，但不能因此否定我现在提出的问题。","f":"以后是否改变看法是以后的事。我们先谈眼前这件具体事情。"},"fit":"父母用未来身份否定当前观点","why":"不争论未来谁更懂谁，把对话拉回当前事实与需求。","next":"避免反过来贬低父母经历；重点是当前问题仍值得讨论。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["等你自己有孩子就知道了。","你现在不懂父母的苦心。","等你当了妈，你就不会这么说了。","你没经历过，没资格评价。"]},{"id":"C-FIN01","sc":"money_duty","stage":1,"name":"把经济期待说清楚","kw":["给家里钱","工资","上交","孝顺钱","收入"],"r":{"g":"我愿意讨论在能力范围内怎么支持家里。我们可以把具体金额和用途说清楚。","b":"我可以根据收入、必要支出和储蓄目标确定支持额度，不适合临时用情绪决定。","f":"我会考虑家庭需要，但我的收入安排需要由我根据实际情况决定。"},"fit":"父母要求固定给钱或对收入作道德评价","why":"把道德争论转成可持续、可协商的财务安排。","next":"若用户经济尚未独立，应避免建议做出无法承担的承诺。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你工作了就应该每个月给家里钱。","你赚的钱不能只顾自己。","你一个人在外面花那么多，家里呢？","你到底挣多少，能给家里多少？"]},{"id":"C-FIN02","sc":"money_duty","stage":2,"name":"回应“别人家孩子给得更多”","kw":["给多少","别人都给","每月转钱","不如别人","养家"],"r":{"g":"每个家庭的收入和支出不同。我愿意讨论我们家的实际需要和我能承担的范围。","b":"我会根据自己的实际收入、支出和储蓄安排来决定支持额度，不直接照搬别人家的做法。","f":"我不想用和别人比较来决定钱的问题。我们可以具体谈实际需要和可承担金额。"},"fit":"父母比较子女给家里的金额","why":"以实际预算代替比较，避免无限抬高支持标准。","next":"可以用预算表讨论，不需要在情绪争执中立即承诺金额。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["别人家孩子每个月给父母几千。","你怎么就给这么点？","你挣得比以前多了，给家里也该多一点。","你有钱买东西，没钱给父母？"]},{"id":"C-FIN03","sc":"money_duty","stage":3,"name":"区分孝顺与服从","kw":["孝顺","不孝","听父母","忤逆","白养"],"r":{"g":"我在乎你们，也愿意承担自己该承担的责任。但孝顺不等于所有事情都必须意见一致。","b":"我可以关心和支持你们，同时保留自己作决定的权利。","f":"如果孝顺意味着我不能有不同意见，那我们对孝顺的理解确实不同。"},"fit":"父母把听话、按安排生活等同于孝顺","why":"把关心、责任和服从分开讨论，不接受单一标准垄断关系定义。","next":"如果涉及具体照护责任，可以另行谈责任分配，不必将所有分歧都升级为孝顺问题。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你这样就是不孝。","孝顺的孩子不会让父母难过。","你连这点都不肯听，还谈什么孝顺？","父母说的话你必须放在第一位。"]},{"id":"C-FIN04","sc":"money_duty","stage":2,"name":"对借钱与担保提出明确条件","kw":["借钱","担保","帮亲戚","贷款","签字"],"r":{"g":"我愿意了解具体情况，但需要先看金额、风险、还款安排和我是否承担得起。","b":"借款或担保会影响我的财务责任，我需要看清合同和风险，不能只凭亲情决定。","f":"我不会在没弄清风险前签字或承诺借款。请先把具体材料给我，我再决定。"},"fit":"父母要求借钱、担保或承担亲友债务","why":"把高风险的金钱请求从情感压力转为具体信息和风险判断。","next":"涉及担保、借贷、合同等事项时，建议用户独立核实并必要时咨询专业人士。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你先帮亲戚担保一下，都是一家人。","家里急用钱，你先把存款拿出来。","你收入稳定，帮忙贷款没什么。","你不帮就是不顾家。"]},{"id":"C-FIN05","sc":"money_duty","stage":3,"name":"对附带条件的帮助说清边界","kw":["我给你钱","住我的房子","听我的","条件","我帮你"],"r":{"g":"我感谢你提供的帮助。我们可以把帮助的条件提前说清楚，避免事后彼此不舒服。","b":"如果这份支持附带明确条件，我需要先知道并判断能不能接受。","f":"我不会默认接受事后增加的条件。我们可以重新谈安排，也可以讨论我如何逐步减少依赖。"},"fit":"父母提供经济帮助后要求控制工作、伴侣或居住","why":"让资源支持与控制条件透明化，给用户现实选择空间。","next":"如果用户当前依赖住房或资金，先评估现实风险并制定渐进计划，不建议冲动对抗。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["房子是我买的，你就得听我的。","我帮你找工作，你就不能拒绝。","既然用家里的钱，就按家里的规矩来。","我都帮你这么多了，你还想自己做主？"]},{"id":"C-PRI01","sc":"privacy","stage":1,"name":"设定手机与私人信息边界","kw":["看手机","聊天记录","密码","检查手机","不能有秘密"],"r":{"g":"有些事情我愿意主动分享，但私人聊天也需要自己的空间。","b":"我理解你想了解我的生活，但我不会开放全部聊天记录。重要的事情我会主动告诉你。","f":"我不会交出手机密码或私人聊天记录。这个边界希望你尊重。"},"fit":"父母要求看手机、聊天记录或密码","why":"区分主动分享与全面检查，建立清晰的隐私边界。","next":"如果拒绝查看可能引发危险或经济控制，优先评估安全和现实处境。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["手机给我看看，有什么不能看的？","你是我孩子，怎么不能知道密码？","我看看你和谁聊天。","一家人还藏什么秘密？"]},{"id":"C-PRI02","sc":"privacy","stage":2,"name":"对亲密关系追问设限","kw":["和谁在一起","睡过没有","具体细节","住一起","关系进展"],"r":{"g":"我知道你会好奇，但有些亲密细节我不打算分享。关系稳定后，我会在愿意的范围内介绍。","b":"我愿意分享基本情况，但不讨论私密细节。这个范围希望你尊重。","f":"这属于我的私人生活，我不回答这些细节问题。"},"fit":"父母持续追问伴侣身份、细节或性生活","why":"把可分享信息与私人细节区分开，不必因亲子关系而放弃隐私。","next":"如果涉及安全、健康或共同生活安排，可以主动提供必要信息。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你们到底发展到哪一步了？","你们有没有住一起？","把她的照片发来我看看。","你们私下到底是什么情况？"]},{"id":"C-PRI03","sc":"privacy","stage":1,"name":"对收入和存款追问设置范围","kw":["存款多少","工资多少","花在哪了","银行卡","账单"],"r":{"g":"我可以聊大致的收入和规划，但不准备逐笔汇报所有消费。","b":"涉及共同承担的家庭开支，我愿意提供必要信息；个人账户和每笔消费由我自己管理。","f":"我不会提供完整账户或账单信息。我们可以只讨论实际需要共同承担的部分。"},"fit":"父母要求透露全部收入、存款或消费记录","why":"按共享责任的范围分享信息，避免从关心滑向全面财务监控。","next":"若父母与用户存在共同债务、共同账户，应按实际法律和财务关系区分。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你卡里到底有多少钱？","每个月工资都花到哪里了？","把账单给我看看。","你不告诉我就是不信任家里。"]},{"id":"C-PRI04","sc":"privacy","stage":2,"name":"拒绝把私事转述给亲友","kw":["告诉亲戚","家里人都知道","分享一下","有什么不能说","我跟你姨说了"],"r":{"g":"我知道你可能只是想找人商量，但这些是我的私人信息。以后转述前请先问我。","b":"我的私事是否分享，希望由我决定。你可以先征求我的同意。","f":"请不要再未经同意把我的私人信息告诉亲友。如果已经说了，也请不要继续扩散。"},"fit":"父母把用户的感情、收入、工作困境告诉亲戚","why":"明确隐私分享需要事先同意，给出未来可执行规则。","next":"如涉及人身安全或紧急照护，可在必要范围内向可信任的人寻求帮助。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我已经把你的事情告诉你姨了，她也是关心你。","这有什么不能说的，都是一家人。","亲戚问起来我总得有话说吧。","我把你最近的情况发家庭群了。"]},{"id":"C-PRI05","sc":"privacy","stage":3,"name":"回应“你为什么什么都不告诉我”","kw":["什么都不说","不信任我","不把我当妈","有事不告诉","疏远"],"r":{"g":"我不是所有事情都不愿意说，只是希望有些内容由我自己决定什么时候分享。","b":"亲近不代表没有隐私。我愿意分享，也需要有自己的空间。","f":"我愿意保持联系，但不会承诺什么都汇报。请把这两件事分开。"},"fit":"父母把有限分享解读为不亲近、不信任","why":"把关系亲密度与信息透明度分开，不让“爱不爱”成为交出隐私的条件。","next":"如果用户希望增加亲密感，可主动选择一个舒适的话题分享，而不是被迫全盘开放。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你现在什么事都不告诉我。","你是不是根本不信任我？","你把我当外人了。","以前什么都说，现在怎么这样？"]},{"id":"C-KIN01","sc":"relatives","stage":1,"name":"回应亲戚询问的统一口径","kw":["亲戚问","怎么回答","过年","饭桌上","别人会问"],"r":{"g":"我们可以提前准备一个简短回答，比如“目前有自己的安排，有进展会分享”，不需要解释太多。","b":"我可以礼貌回答，但不会为了让亲戚满意而编造情况。","f":"我会自己决定分享多少。亲戚的好奇不代表我必须交代私事。"},"fit":"父母要求准备婚姻、工作等问题的标准答案","why":"提供低信息量的社交回应，减少用户在家庭聚会中被围问。","next":"若用户愿意，可提前约定父母不主动披露其私事。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["过年亲戚问你对象，你准备怎么说？","你别让我们在亲戚面前难堪。","别人问工资，你要说得体面一点。","你得给家里争口气。"]},{"id":"C-KIN02","sc":"relatives","stage":2,"name":"拒绝以家族面子安排人生","kw":["争口气","丢人","家族脸面","让人笑话","面子"],"r":{"g":"我理解你在意别人怎么看，但我的人生决定还需要考虑我自己真实的生活。","b":"我会考虑外界影响，但不能把别人的评价当成唯一标准。","f":"我不会为了维护面子去做不适合自己的决定。"},"fit":"父母强调给家里争光、不能丢人","why":"区分社会评价与个人生活后果，避免将面子变成无限命令。","next":"涉及现实歧视或家庭安全时，应结合环境决定公开程度和应对方式。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你这样让家里脸往哪儿放？","我们家不能被别人看笑话。","你要争口气，别给家里丢人。","别人会怎么评价我们？"]},{"id":"C-KIN03","sc":"relatives","stage":3,"name":"面对饭桌围问简短转场","kw":["当众问","大家都关心","说说嘛","对象呢","工资多少"],"r":{"g":"谢谢关心，目前还没有什么特别需要分享的。我们聊聊别的吧。","b":"这个话题我先不展开了。最近大家都怎么样？","f":"这是我的私人事情，我不想在饭桌上讨论。我们换个话题。"},"fit":"亲友当众追问私事，父母要求配合回答","why":"用简短回答与转场结束围问，不提供更多可继续追问的细节。","next":"如果现场不安全或强烈对抗可能升级，可以选择离席或寻求可信任的人协助。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["大家都在关心你，你就说说对象的事。","你工资到底多少，别不好意思。","在家里有什么不能讲的？","你怎么这么扫兴，问两句都不说。"]},{"id":"C-KIN04","sc":"relatives","stage":2,"name":"要求父母不要代替自己解释","kw":["替你解释","我帮你说","我跟亲戚讲","编个理由","别说实话"],"r":{"g":"谢谢你想帮我挡问题。下次可以先问问我想怎么说，我更希望用简单真实的回答。","b":"如果需要回应亲戚，我们可以商量口径，但请不要替我编造我没有同意的事情。","f":"请不要再替我编理由或公开解释我的私事。我会自己决定怎么回答。"},"fit":"父母替用户向亲戚编造理由或过度解释","why":"建立共同商量的对外口径，避免父母出于保护或面子替用户掌控叙事。","next":"有些信息确实可以选择不公开；不公开不等于必须编造虚假细节。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我就说你工作忙，省得亲戚问。","我帮你编个理由，你别拆穿。","你那些事不能跟亲戚说。","我已经替你解释过了。"]},{"id":"C-KIN05","sc":"relatives","stage":3,"name":"应对“别人都这么做”","kw":["大家都这样","传统","规矩","一直如此","别人家"],"r":{"g":"我知道这是家里的习惯。我们可以保留重要的部分，也讨论哪些安排更适合我。","b":"习惯可以参考，但具体做法还是需要看当事人的情况。","f":"我尊重家里的传统，但不会因为“大家都这样”就自动接受所有安排。"},"fit":"父母以传统、习俗或家族惯例要求照做","why":"承认传统的意义，同时允许针对现实情况进行协商。","next":"涉及婚礼、祭祀等共同活动，可区分仪式参与与个人重大决定。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["我们家一直都是这样。","大家结婚都要按这个流程。","亲戚家孩子都这么安排，你也一样。","这是规矩，不能到你这儿变。"]},{"id":"C-BND01","sc":"boundaries","stage":2,"name":"约定可持续的联系频率","kw":["每天打电话","报平安","不接电话","多久联系","必须回"],"r":{"g":"我们可以约定一个比较稳定的联系时间，比如每周几次。这样我也能安排好自己的事情。","b":"我会保持联系，但不一定每天都能及时接电话。我们约定固定时间会更稳定。","f":"我不会承诺随时接听。紧急情况请发消息说明，平时我会在方便时回复。"},"fit":"父母要求每天报平安或随时接电话","why":"把抽象的“多联系”转成可执行的频率和紧急联系规则。","next":"联系频率应考虑家庭照护需求、用户工作节奏和双方接受程度。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你每天都得给家里打电话。","你怎么好几天都不联系？","我打电话你必须接。","你出去住了就不管家里了吗？"]},{"id":"C-BND02","sc":"boundaries","stage":4,"name":"在争吵升级时暂停对话","kw":["吵起来","你闭嘴","越说越气","不让说","提高声音"],"r":{"g":"我们现在都很激动，继续说可能只会更难听。先停一会儿，等平静后再聊。","b":"现在的谈话已经很难继续了，我先暂停。之后如果能平静交流，我们再谈。","f":"我现在结束这次通话。等可以互相尊重地说话时再联系。"},"fit":"双方音量提高、开始打断或情绪失控","why":"将暂停作为降温措施，而不是惩罚或威胁。","next":"如果对方可能采取暴力、跟踪或其他报复行为，优先考虑现实安全，不必当场宣布边界。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你现在就给我说清楚！","你别打断我！","我今天非得把话说完。","你敢挂电话试试。"]},{"id":"C-BND03","sc":"boundaries","stage":4,"name":"对辱骂设定明确后果","kw":["骂人","羞辱","威胁","废物","没用"],"r":{"g":"我愿意谈具体问题，但不接受互相辱骂。我们先停下来，等平静后再聊。","b":"如果继续人身攻击，我会结束这次通话。我们可以在能正常交流时再谈。","f":"我现在结束对话。之后如果有威胁或辱骂，我会先保护自己，不继续回应。"},"fit":"父母使用侮辱、威胁或持续人身攻击","why":"明确行为边界与可执行后果，不以羞辱还击。","next":"若存在真实威胁或暴力风险，应优先离开危险环境、联系可信任的人或当地紧急服务。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你真没用。","你就是个白眼狼。","我看你能有什么好下场。","你再这样我就让你后悔。"]},{"id":"C-BND04","sc":"boundaries","stage":4,"name":"结束当下话题但保留关系","kw":["不想聊","说够了","结束话题","没精力","改天再说"],"r":{"g":"我知道你还有想说的，但我现在没有精力继续。我们改天再聊其他事情。","b":"这个问题今天先到这里。我会自己继续考虑，之后有需要再谈。","f":"我现在结束这次讨论。你不必同意，但我需要停下来。"},"fit":"用户已经疲惫，不想继续讨论某个问题","why":"让用户拥有结束当前谈话的权利，同时保留未来正常联系的可能。","next":"如果有必须立即处理的现实事项，可明确约定后续时间；不必在疲惫时解决所有问题。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你今天必须给我个答案。","这个话题没说清楚不许挂电话。","我还有很多话要说，你听完再走。","你不把话讲明白就别想结束。"]},{"id":"C-BND05","sc":"boundaries","stage":1,"name":"冲突后修复但不撤销边界","kw":["刚吵完","缓和一下","道歉","关系僵","怎么开口"],"r":{"g":"我不希望我们一直僵着，也愿意好好相处。不过之前让我不舒服的部分，我希望以后能有些改变。","b":"我愿意恢复正常交流，但不想把问题当作从没发生。我们可以先缓和，再找合适的时候谈。","f":"我愿意继续联系，但和好不等于我必须撤回自己的边界。"},"fit":"用户希望关系缓和，但不想假装问题不存在","why":"将关系修复与放弃边界分开，让用户既能缓和关系，也能保留真实立场。","next":"如果对方尚未准备好讨论，可以先恢复日常联系，再择机谈具体行为。","caution":"根据真实意愿调整，不必承诺自己做不到的事。","examples":["你还在生气吗？","我们别闹了，就当没发生。","你先跟我道歉，这事就过去了。","你怎么还记着这件事？"]}],"utt":[{"t":"你怎么还不谈恋爱？","id":"C-MAR01"},{"t":"你身边就没有合适的人吗？","id":"C-MAR01"},{"t":"你总一个人，什么时候才能有对象？","id":"C-MAR01"},{"t":"你也该主动一点了。","id":"C-MAR01"},{"t":"你都这么大了，再拖就来不及了。","id":"C-MAR02"},{"t":"女孩子年龄很重要，你自己要有数。","id":"C-MAR02"},{"t":"等你年纪更大就没人要了。","id":"C-MAR02"},{"t":"你现在条件好，别把时间浪费了。","id":"C-MAR02"},{"t":"我让你姨给你介绍，你自己也要上心。","id":"C-MAR03"},{"t":"你先把自己状态调整好，人家才愿意接触你。","id":"C-MAR03"},{"t":"我认识一些条件不错的人，以后给你看看。","id":"C-MAR03"},{"t":"你别光说不行动，我会帮你留意的。","id":"C-MAR03"},{"t":"你这样下去谁会喜欢你？","id":"C-MAR04"},{"t":"一个人怎么会幸福？","id":"C-MAR04"},{"t":"你条件也不差，怎么就不抓紧？","id":"C-MAR04"},{"t":"女人最终还是要有个归宿。","id":"C-MAR04"},{"t":"你到底什么时候结婚，给个准话。","id":"C-MAR05"},{"t":"你就按我说的标准找，别自己瞎挑。","id":"C-MAR05"},{"t":"这件事你必须听我们的。","id":"C-MAR05"},{"t":"你先答应我们会认真相亲。","id":"C-MAR05"},{"t":"你怎么能喜欢同性？","id":"C-REL01"},{"t":"你还是找个男人结婚吧。","id":"C-REL01"},{"t":"你现在这个女朋友不算数。","id":"C-REL01"},{"t":"你以后就知道正常家庭多重要了。","id":"C-REL01"},{"t":"我都是为你好，你赶紧和她分开。","id":"C-REL02"},{"t":"我不可能同意你们继续在一起。","id":"C-REL02"},{"t":"你现在不分手，以后受苦的是你。","id":"C-REL02"},{"t":"你先把这段关系断了再说。","id":"C-REL02"},{"t":"你老了谁照顾你？","id":"C-REL03"},{"t":"以后没有孩子，你就知道苦了。","id":"C-REL03"},{"t":"别人会怎么看你们？","id":"C-REL03"},{"t":"你现在开心，以后就等着后悔吧。","id":"C-REL03"},{"t":"你只是现在想法不成熟。","id":"C-REL04"},{"t":"等你再长大一点就会变了。","id":"C-REL04"},{"t":"肯定是身边的人影响你。","id":"C-REL04"},{"t":"你再想想，别这么早下结论。","id":"C-REL04"},{"t":"你们的事别带回家，亲戚问起来我怎么说？","id":"C-REL05"},{"t":"不要在外面说这些，太丢人了。","id":"C-REL05"},{"t":"过年不许带她回来。","id":"C-REL05"},{"t":"你自己知道就行，别让别人知道。","id":"C-REL05"},{"t":"找工作还是稳定最重要。","id":"C-JOB01"},{"t":"你就考个编制，别再折腾了。","id":"C-JOB01"},{"t":"小公司不靠谱，还是进大厂。","id":"C-JOB01"},{"t":"工作不用喜欢，能干一辈子就行。","id":"C-JOB01"},{"t":"你早就应该准备了，现在着急有什么用？","id":"C-JOB02"},{"t":"你就是不够努力。","id":"C-JOB02"},{"t":"我早跟你说了，你不听。","id":"C-JOB02"},{"t":"你要是早点准备，现在就不会这样。","id":"C-JOB02"},{"t":"你读这么多年书，就拿这点工资？","id":"C-JOB03"},{"t":"这个工作有什么前途？","id":"C-JOB03"},{"t":"你看看别人家的孩子工资多少。","id":"C-JOB03"},{"t":"做这个能养活自己吗？","id":"C-JOB03"},{"t":"你看你表姐，早就进大公司了。","id":"C-JOB04"},{"t":"你同学都买房了，你还在干什么？","id":"C-JOB04"},{"t":"别人都能做到，你为什么不行？","id":"C-JOB04"},{"t":"你就不能学学人家吗？","id":"C-JOB04"},{"t":"我都给你想好了，你照做就行。","id":"C-JOB05"},{"t":"你没经验，听我的不会错。","id":"C-JOB05"},{"t":"我托人给你找了工作，你必须去。","id":"C-JOB05"},{"t":"我都是过来人，你别自己做主。","id":"C-JOB05"},{"t":"你别再和那个人来往了。","id":"C-LIF01"},{"t":"我看你那些朋友都不靠谱。","id":"C-LIF01"},{"t":"和他们在一起能有什么好处？","id":"C-LIF01"},{"t":"你把朋友看得比家里还重要。","id":"C-LIF01"},{"t":"你每天必须几点睡觉。","id":"C-LIF02"},{"t":"你出去要提前告诉我去哪、和谁。","id":"C-LIF02"},{"t":"我说了你就照做，别问为什么。","id":"C-LIF02"},{"t":"你自己的生活怎么能安排成这样？","id":"C-LIF02"},{"t":"你怎么又穿成这样？","id":"C-LIF03"},{"t":"你是不是胖了，得减肥了。","id":"C-LIF03"},{"t":"女孩子要注意形象。","id":"C-LIF03"},{"t":"你这个发型别人会怎么想？","id":"C-LIF03"},{"t":"你毕业了就回来，别在外面漂。","id":"C-LIF04"},{"t":"家里又不是没有地方，为什么非要搬出去？","id":"C-LIF04"},{"t":"你去那么远，我们怎么办？","id":"C-LIF04"},{"t":"我不想你留在外地。","id":"C-LIF04"},{"t":"我已经替你答应亲戚周末回去了。","id":"C-LIF05"},{"t":"我都帮你安排好了，你到时候去就行。","id":"C-LIF05"},{"t":"这有什么好问你的，我是你妈。","id":"C-LIF05"},{"t":"我已经替你报了名，你不要浪费我的心意。","id":"C-LIF05"},{"t":"你要积极一点。","id":"C-LECT01"},{"t":"你现在就是不够上心。","id":"C-LECT01"},{"t":"人还是要有点追求。","id":"C-LECT01"},{"t":"你态度端正了，事情自然就成了。","id":"C-LECT01"},{"t":"你先听我把话说完。","id":"C-LECT02"},{"t":"我是在跟你分享人生经验。","id":"C-LECT02"},{"t":"人家有钱人都是这样做的。","id":"C-LECT02"},{"t":"这些道理你以后自然就懂了。","id":"C-LECT02"},{"t":"我当年就是这么过来的。","id":"C-LECT03"},{"t":"我吃过的盐比你吃过的饭还多。","id":"C-LECT03"},{"t":"你现在不听，早晚会吃亏。","id":"C-LECT03"},{"t":"过来人的话你得记住。","id":"C-LECT03"},{"t":"做人要有格局。","id":"C-LECT04"},{"t":"你要积极阳光一点。","id":"C-LECT04"},{"t":"路都是自己走出来的。","id":"C-LECT04"},{"t":"你要把眼光放长远，别只看眼前。","id":"C-LECT04"},{"t":"你都这么大了，应该懂事。","id":"C-LECT05"},{"t":"成熟的人不会像你这样。","id":"C-LECT05"},{"t":"你就不能顾全大局吗？","id":"C-LECT05"},{"t":"一家人之间不要这么计较。","id":"C-LECT05"},{"t":"我跟你说了多少遍了？","id":"C-REP01"},{"t":"你怎么还是不明白我的意思？","id":"C-REP01"},{"t":"我再跟你强调一次。","id":"C-REP01"},{"t":"你到底听进去没有？","id":"C-REP01"},{"t":"我说这么多，你一句都不听。","id":"C-REP02"},{"t":"你怎么这么犟？","id":"C-REP02"},{"t":"你要是听我的早就好了。","id":"C-REP02"},{"t":"我说的话你什么时候真正听过？","id":"C-REP02"},{"t":"我给你打这么多电话你为什么不接？","id":"C-REP03"},{"t":"你怎么一直不回消息？","id":"C-REP03"},{"t":"我发了这么多条你看见没有？","id":"C-REP03"},{"t":"你现在必须给我回电话。","id":"C-REP03"},{"t":"行，我以后再也不管你了。","id":"C-REP04"},{"t":"随便你吧，我说什么都没用。","id":"C-REP04"},{"t":"我不说了，反正你也不听。","id":"C-REP04"},{"t":"你爱怎样就怎样。","id":"C-REP04"},{"t":"我们每次聊到最后还是这个问题。","id":"C-REP05"},{"t":"你不把这件事解决，我就会一直说。","id":"C-REP05"},{"t":"我今天必须把这个道理跟你讲清楚。","id":"C-REP05"},{"t":"你每次都转移话题。","id":"C-REP05"},{"t":"你怎么这么自私？","id":"C-CRI01"},{"t":"你真是越来越不懂事了。","id":"C-CRI01"},{"t":"我白养你这么多年。","id":"C-CRI01"},{"t":"你现在怎么变成这样了？","id":"C-CRI01"},{"t":"你看人家工作多好。","id":"C-CRI02"},{"t":"你表姐都结婚买房了。","id":"C-CRI02"},{"t":"同样是读书，人家怎么就比你强？","id":"C-CRI02"},{"t":"别人能做到，你怎么不行？","id":"C-CRI02"},{"t":"我就说你两句，你至于吗？","id":"C-CRI03"},{"t":"你怎么这么敏感？","id":"C-CRI03"},{"t":"我开个玩笑你也生气。","id":"C-CRI03"},{"t":"你就是想太多了。","id":"C-CRI03"},{"t":"你根本没有这个能力。","id":"C-CRI04"},{"t":"你想得太美了，肯定做不成。","id":"C-CRI04"},{"t":"你这点本事能干什么？","id":"C-CRI04"},{"t":"别折腾了，你没有那个命。","id":"C-CRI04"},{"t":"你就不能好好说话吗？","id":"C-CRI05"},{"t":"你现在是什么态度？","id":"C-CRI05"},{"t":"你跟谁学得这么刻薄？","id":"C-CRI05"},{"t":"长辈说你两句还不行了？","id":"C-CRI05"},{"t":"我做这一切都是为你好。","id":"C-GUILT01"},{"t":"我这么替你着想，你还不领情。","id":"C-GUILT01"},{"t":"我还能害你吗？","id":"C-GUILT01"},{"t":"我说这些都是因为我关心你。","id":"C-GUILT01"},{"t":"我为你付出这么多，你就这样回报我？","id":"C-GUILT02"},{"t":"我为了你什么都舍得，你却不听话。","id":"C-GUILT02"},{"t":"我辛辛苦苦把你养大容易吗？","id":"C-GUILT02"},{"t":"你欠我们的太多了。","id":"C-GUILT02"},{"t":"你真的太让我失望了。","id":"C-GUILT03"},{"t":"你这样做让我心都凉了。","id":"C-GUILT03"},{"t":"我辛苦这么多年，最后被你气成这样。","id":"C-GUILT03"},{"t":"你就不能让我省点心吗？","id":"C-GUILT03"},{"t":"你这样让我每天都睡不好。","id":"C-GUILT04"},{"t":"我担心得饭都吃不下。","id":"C-GUILT04"},{"t":"我身体这么差，你还让我操心。","id":"C-GUILT04"},{"t":"你什么时候才能让我放心？","id":"C-GUILT04"},{"t":"等你自己有孩子就知道了。","id":"C-GUILT05"},{"t":"你现在不懂父母的苦心。","id":"C-GUILT05"},{"t":"等你当了妈，你就不会这么说了。","id":"C-GUILT05"},{"t":"你没经历过，没资格评价。","id":"C-GUILT05"},{"t":"你工作了就应该每个月给家里钱。","id":"C-FIN01"},{"t":"你赚的钱不能只顾自己。","id":"C-FIN01"},{"t":"你一个人在外面花那么多，家里呢？","id":"C-FIN01"},{"t":"你到底挣多少，能给家里多少？","id":"C-FIN01"},{"t":"别人家孩子每个月给父母几千。","id":"C-FIN02"},{"t":"你怎么就给这么点？","id":"C-FIN02"},{"t":"你挣得比以前多了，给家里也该多一点。","id":"C-FIN02"},{"t":"你有钱买东西，没钱给父母？","id":"C-FIN02"},{"t":"你这样就是不孝。","id":"C-FIN03"},{"t":"孝顺的孩子不会让父母难过。","id":"C-FIN03"},{"t":"你连这点都不肯听，还谈什么孝顺？","id":"C-FIN03"},{"t":"父母说的话你必须放在第一位。","id":"C-FIN03"},{"t":"你先帮亲戚担保一下，都是一家人。","id":"C-FIN04"},{"t":"家里急用钱，你先把存款拿出来。","id":"C-FIN04"},{"t":"你收入稳定，帮忙贷款没什么。","id":"C-FIN04"},{"t":"你不帮就是不顾家。","id":"C-FIN04"},{"t":"房子是我买的，你就得听我的。","id":"C-FIN05"},{"t":"我帮你找工作，你就不能拒绝。","id":"C-FIN05"},{"t":"既然用家里的钱，就按家里的规矩来。","id":"C-FIN05"},{"t":"我都帮你这么多了，你还想自己做主？","id":"C-FIN05"},{"t":"手机给我看看，有什么不能看的？","id":"C-PRI01"},{"t":"你是我孩子，怎么不能知道密码？","id":"C-PRI01"},{"t":"我看看你和谁聊天。","id":"C-PRI01"},{"t":"一家人还藏什么秘密？","id":"C-PRI01"},{"t":"你们到底发展到哪一步了？","id":"C-PRI02"},{"t":"你们有没有住一起？","id":"C-PRI02"},{"t":"把她的照片发来我看看。","id":"C-PRI02"},{"t":"你们私下到底是什么情况？","id":"C-PRI02"},{"t":"你卡里到底有多少钱？","id":"C-PRI03"},{"t":"每个月工资都花到哪里了？","id":"C-PRI03"},{"t":"把账单给我看看。","id":"C-PRI03"},{"t":"你不告诉我就是不信任家里。","id":"C-PRI03"},{"t":"我已经把你的事情告诉你姨了，她也是关心你。","id":"C-PRI04"},{"t":"这有什么不能说的，都是一家人。","id":"C-PRI04"},{"t":"亲戚问起来我总得有话说吧。","id":"C-PRI04"},{"t":"我把你最近的情况发家庭群了。","id":"C-PRI04"},{"t":"你现在什么事都不告诉我。","id":"C-PRI05"},{"t":"你是不是根本不信任我？","id":"C-PRI05"},{"t":"你把我当外人了。","id":"C-PRI05"},{"t":"以前什么都说，现在怎么这样？","id":"C-PRI05"},{"t":"过年亲戚问你对象，你准备怎么说？","id":"C-KIN01"},{"t":"你别让我们在亲戚面前难堪。","id":"C-KIN01"},{"t":"别人问工资，你要说得体面一点。","id":"C-KIN01"},{"t":"你得给家里争口气。","id":"C-KIN01"},{"t":"你这样让家里脸往哪儿放？","id":"C-KIN02"},{"t":"我们家不能被别人看笑话。","id":"C-KIN02"},{"t":"你要争口气，别给家里丢人。","id":"C-KIN02"},{"t":"别人会怎么评价我们？","id":"C-KIN02"},{"t":"大家都在关心你，你就说说对象的事。","id":"C-KIN03"},{"t":"你工资到底多少，别不好意思。","id":"C-KIN03"},{"t":"在家里有什么不能讲的？","id":"C-KIN03"},{"t":"你怎么这么扫兴，问两句都不说。","id":"C-KIN03"},{"t":"我就说你工作忙，省得亲戚问。","id":"C-KIN04"},{"t":"我帮你编个理由，你别拆穿。","id":"C-KIN04"},{"t":"你那些事不能跟亲戚说。","id":"C-KIN04"},{"t":"我已经替你解释过了。","id":"C-KIN04"},{"t":"我们家一直都是这样。","id":"C-KIN05"},{"t":"大家结婚都要按这个流程。","id":"C-KIN05"},{"t":"亲戚家孩子都这么安排，你也一样。","id":"C-KIN05"},{"t":"这是规矩，不能到你这儿变。","id":"C-KIN05"},{"t":"你每天都得给家里打电话。","id":"C-BND01"},{"t":"你怎么好几天都不联系？","id":"C-BND01"},{"t":"我打电话你必须接。","id":"C-BND01"},{"t":"你出去住了就不管家里了吗？","id":"C-BND01"},{"t":"你现在就给我说清楚！","id":"C-BND02"},{"t":"你别打断我！","id":"C-BND02"},{"t":"我今天非得把话说完。","id":"C-BND02"},{"t":"你敢挂电话试试。","id":"C-BND02"},{"t":"你真没用。","id":"C-BND03"},{"t":"你就是个白眼狼。","id":"C-BND03"},{"t":"我看你能有什么好下场。","id":"C-BND03"},{"t":"你再这样我就让你后悔。","id":"C-BND03"},{"t":"你今天必须给我个答案。","id":"C-BND04"},{"t":"这个话题没说清楚不许挂电话。","id":"C-BND04"},{"t":"我还有很多话要说，你听完再走。","id":"C-BND04"},{"t":"你不把话讲明白就别想结束。","id":"C-BND04"},{"t":"你还在生气吗？","id":"C-BND05"},{"t":"我们别闹了，就当没发生。","id":"C-BND05"},{"t":"你先跟我道歉，这事就过去了。","id":"C-BND05"},{"t":"你怎么还记着这件事？","id":"C-BND05"}],"kw":[{"k":"找对象","sc":"marriage"},{"k":"谈恋爱","sc":"marriage"},{"k":"怎么还没对象","sc":"marriage"},{"k":"单身","sc":"marriage"},{"k":"抓紧找","sc":"marriage"},{"k":"年纪","sc":"marriage"},{"k":"年龄","sc":"marriage"},{"k":"再不结婚","sc":"marriage"},{"k":"来不及","sc":"marriage"},{"k":"黄金年龄","sc":"marriage"},{"k":"介绍对象","sc":"marriage"},{"k":"相亲","sc":"marriage"},{"k":"给你找","sc":"marriage"},{"k":"帮你物色","sc":"marriage"},{"k":"安排见面","sc":"marriage"},{"k":"没人要","sc":"marriage"},{"k":"嫁出去","sc":"marriage"},{"k":"娶进门","sc":"marriage"},{"k":"条件","sc":"marriage"},{"k":"剩下","sc":"marriage"},{"k":"什么时候结婚","sc":"marriage"},{"k":"给个准话","sc":"marriage"},{"k":"必须结婚","sc":"marriage"},{"k":"听我们的","sc":"marriage"},{"k":"条件要好","sc":"marriage"},{"k":"同性恋","sc":"relationship"},{"k":"女朋友","sc":"relationship"},{"k":"男朋友","sc":"relationship"},{"k":"不正常","sc":"relationship"},{"k":"找个男人","sc":"relationship"},{"k":"找个女人","sc":"relationship"},{"k":"为你好","sc":"relationship"},{"k":"分手","sc":"relationship"},{"k":"断掉联系","sc":"relationship"},{"k":"别再来往","sc":"relationship"},{"k":"你会后悔","sc":"relationship"},{"k":"老了怎么办","sc":"relationship"},{"k":"没人陪你","sc":"relationship"},{"k":"以后后悔","sc":"relationship"},{"k":"社会怎么看","sc":"relationship"},{"k":"孤独终老","sc":"relationship"},{"k":"一时冲动","sc":"relationship"},{"k":"阶段","sc":"relationship"},{"k":"长大就好了","sc":"relationship"},{"k":"被带坏","sc":"relationship"},{"k":"想清楚","sc":"relationship"},{"k":"别带回来","sc":"relationship"},{"k":"别告诉亲戚","sc":"relationship"},{"k":"丢人","sc":"relationship"},{"k":"不能公开","sc":"relationship"},{"k":"不要让人知道","sc":"relationship"},{"k":"稳定","sc":"career"},{"k":"编制","sc":"career"},{"k":"铁饭碗","sc":"career"},{"k":"大公司","sc":"career"},{"k":"别折腾","sc":"career"},{"k":"努力","sc":"career"},{"k":"准备","sc":"career"},{"k":"拖延","sc":"career"},{"k":"不够上进","sc":"career"},{"k":"你早该","sc":"career"},{"k":"工资太低","sc":"career"},{"k":"没前途","sc":"career"},{"k":"挣不到钱","sc":"career"},{"k":"别人都比你强","sc":"career"},{"k":"有什么用","sc":"career"},{"k":"某某家的孩子","sc":"career"},{"k":"同学都","sc":"career"},{"k":"别人早就","sc":"career"},{"k":"你怎么比不过","sc":"career"},{"k":"同龄人","sc":"career"},{"k":"我给你安排","sc":"career"},{"k":"听我的","sc":"career"},{"k":"你不懂","sc":"career"},{"k":"我认识人","sc":"career"},{"k":"照我说的做","sc":"career"},{"k":"别和她来往","sc":"life_control"},{"k":"交朋友","sc":"life_control"},{"k":"狐朋狗友","sc":"life_control"},{"k":"影响你","sc":"life_control"},{"k":"不三不四","sc":"life_control"},{"k":"几点睡","sc":"life_control"},{"k":"几点起","sc":"life_control"},{"k":"必须回家","sc":"life_control"},{"k":"每天汇报","sc":"life_control"},{"k":"怎么安排","sc":"life_control"},{"k":"胖瘦","sc":"life_control"},{"k":"穿衣服","sc":"life_control"},{"k":"打扮","sc":"life_control"},{"k":"头发","sc":"life_control"},{"k":"不好看","sc":"life_control"},{"k":"回老家","sc":"life_control"},{"k":"留在身边","sc":"life_control"},{"k":"去哪里工作","sc":"life_control"},{"k":"离家太远","sc":"life_control"},{"k":"搬回来","sc":"life_control"},{"k":"我已经替你答应","sc":"life_control"},{"k":"我帮你决定","sc":"life_control"},{"k":"不用问你","sc":"life_control"},{"k":"我都安排好了","sc":"life_control"},{"k":"你必须去","sc":"life_control"},{"k":"积极一点","sc":"lecture"},{"k":"努力一点","sc":"lecture"},{"k":"上进","sc":"lecture"},{"k":"要主动","sc":"lecture"},{"k":"态度","sc":"lecture"},{"k":"你听我说","sc":"lecture"},{"k":"我的感悟","sc":"lecture"},{"k":"经验传下去","sc":"lecture"},{"k":"我告诉你怎么办","sc":"lecture"},{"k":"你要体会","sc":"lecture"},{"k":"我当年","sc":"lecture"},{"k":"过来人","sc":"lecture"},{"k":"听我的没错","sc":"lecture"},{"k":"以前都是","sc":"lecture"},{"k":"经验","sc":"lecture"},{"k":"积极阳光","sc":"lecture"},{"k":"格局","sc":"lecture"},{"k":"格局打开","sc":"lecture"},{"k":"要有眼界","sc":"lecture"},{"k":"说起来容易","sc":"lecture"},{"k":"懂事","sc":"lecture"},{"k":"成熟一点","sc":"lecture"},{"k":"顾全大局","sc":"lecture"},{"k":"别任性","sc":"lecture"},{"k":"让着点","sc":"lecture"},{"k":"我再说一遍","sc":"repetition"},{"k":"你怎么不明白","sc":"repetition"},{"k":"说了多少次","sc":"repetition"},{"k":"听进去没有","sc":"repetition"},{"k":"反复讲","sc":"repetition"},{"k":"不听话","sc":"repetition"},{"k":"不听我的","sc":"repetition"},{"k":"白说了","sc":"repetition"},{"k":"你根本没听","sc":"repetition"},{"k":"犟","sc":"repetition"},{"k":"一直打电话","sc":"repetition"},{"k":"连发消息","sc":"repetition"},{"k":"为什么不回","sc":"repetition"},{"k":"接电话","sc":"repetition"},{"k":"轰炸","sc":"repetition"},{"k":"我不说了","sc":"repetition"},{"k":"随便你","sc":"repetition"},{"k":"我懒得管","sc":"repetition"},{"k":"以后不管你","sc":"repetition"},{"k":"爱怎样怎样","sc":"repetition"},{"k":"又说这个","sc":"repetition"},{"k":"说来说去","sc":"repetition"},{"k":"每次都这样","sc":"repetition"},{"k":"绕回来","sc":"repetition"},{"k":"讲不完","sc":"repetition"},{"k":"自私","sc":"criticism"},{"k":"不懂事","sc":"criticism"},{"k":"没良心","sc":"criticism"},{"k":"白眼狼","sc":"criticism"},{"k":"没出息","sc":"criticism"},{"k":"别人家的孩子","sc":"criticism"},{"k":"表姐","sc":"criticism"},{"k":"同学","sc":"criticism"},{"k":"人家怎么","sc":"criticism"},{"k":"比不过","sc":"criticism"},{"k":"太敏感","sc":"criticism"},{"k":"想太多","sc":"criticism"},{"k":"开不起玩笑","sc":"criticism"},{"k":"玻璃心","sc":"criticism"},{"k":"至于吗","sc":"criticism"},{"k":"你做不到","sc":"criticism"},{"k":"没能力","sc":"criticism"},{"k":"没前途","sc":"criticism"},{"k":"不现实","sc":"criticism"},{"k":"你能成什么","sc":"criticism"},{"k":"你什么态度","sc":"criticism"},{"k":"怎么说话","sc":"criticism"},{"k":"刻薄","sc":"criticism"},{"k":"没大没小","sc":"criticism"},{"k":"顶嘴","sc":"criticism"},{"k":"为你好","sc":"guilt"},{"k":"替你着想","sc":"guilt"},{"k":"都是为了你","sc":"guilt"},{"k":"不领情","sc":"guilt"},{"k":"好心","sc":"guilt"},{"k":"养你","sc":"guilt"},{"k":"付出","sc":"guilt"},{"k":"牺牲","sc":"guilt"},{"k":"欠我的","sc":"guilt"},{"k":"白养","sc":"guilt"},{"k":"让我失望","sc":"guilt"},{"k":"伤我的心","sc":"guilt"},{"k":"我很难过","sc":"guilt"},{"k":"你气死我了","sc":"guilt"},{"k":"心寒","sc":"guilt"},{"k":"睡不着","sc":"guilt"},{"k":"担心死了","sc":"guilt"},{"k":"身体不好","sc":"guilt"},{"k":"让我操心","sc":"guilt"},{"k":"我都是被你气的","sc":"guilt"},{"k":"等你当妈","sc":"guilt"},{"k":"你以后就懂","sc":"guilt"},{"k":"养孩子","sc":"guilt"},{"k":"轮到你","sc":"guilt"},{"k":"不懂父母","sc":"guilt"},{"k":"给家里钱","sc":"money_duty"},{"k":"工资","sc":"money_duty"},{"k":"上交","sc":"money_duty"},{"k":"孝顺钱","sc":"money_duty"},{"k":"收入","sc":"money_duty"},{"k":"给多少","sc":"money_duty"},{"k":"别人都给","sc":"money_duty"},{"k":"每月转钱","sc":"money_duty"},{"k":"不如别人","sc":"money_duty"},{"k":"养家","sc":"money_duty"},{"k":"孝顺","sc":"money_duty"},{"k":"不孝","sc":"money_duty"},{"k":"听父母","sc":"money_duty"},{"k":"忤逆","sc":"money_duty"},{"k":"白养","sc":"money_duty"},{"k":"借钱","sc":"money_duty"},{"k":"担保","sc":"money_duty"},{"k":"帮亲戚","sc":"money_duty"},{"k":"贷款","sc":"money_duty"},{"k":"签字","sc":"money_duty"},{"k":"我给你钱","sc":"money_duty"},{"k":"住我的房子","sc":"money_duty"},{"k":"听我的","sc":"money_duty"},{"k":"条件","sc":"money_duty"},{"k":"我帮你","sc":"money_duty"},{"k":"看手机","sc":"privacy"},{"k":"聊天记录","sc":"privacy"},{"k":"密码","sc":"privacy"},{"k":"检查手机","sc":"privacy"},{"k":"不能有秘密","sc":"privacy"},{"k":"和谁在一起","sc":"privacy"},{"k":"睡过没有","sc":"privacy"},{"k":"具体细节","sc":"privacy"},{"k":"住一起","sc":"privacy"},{"k":"关系进展","sc":"privacy"},{"k":"存款多少","sc":"privacy"},{"k":"工资多少","sc":"privacy"},{"k":"花在哪了","sc":"privacy"},{"k":"银行卡","sc":"privacy"},{"k":"账单","sc":"privacy"},{"k":"告诉亲戚","sc":"privacy"},{"k":"家里人都知道","sc":"privacy"},{"k":"分享一下","sc":"privacy"},{"k":"有什么不能说","sc":"privacy"},{"k":"我跟你姨说了","sc":"privacy"},{"k":"什么都不说","sc":"privacy"},{"k":"不信任我","sc":"privacy"},{"k":"不把我当妈","sc":"privacy"},{"k":"有事不告诉","sc":"privacy"},{"k":"疏远","sc":"privacy"},{"k":"亲戚问","sc":"relatives"},{"k":"怎么回答","sc":"relatives"},{"k":"过年","sc":"relatives"},{"k":"饭桌上","sc":"relatives"},{"k":"别人会问","sc":"relatives"},{"k":"争口气","sc":"relatives"},{"k":"丢人","sc":"relatives"},{"k":"家族脸面","sc":"relatives"},{"k":"让人笑话","sc":"relatives"},{"k":"面子","sc":"relatives"},{"k":"当众问","sc":"relatives"},{"k":"大家都关心","sc":"relatives"},{"k":"说说嘛","sc":"relatives"},{"k":"对象呢","sc":"relatives"},{"k":"工资多少","sc":"relatives"},{"k":"替你解释","sc":"relatives"},{"k":"我帮你说","sc":"relatives"},{"k":"我跟亲戚讲","sc":"relatives"},{"k":"编个理由","sc":"relatives"},{"k":"别说实话","sc":"relatives"},{"k":"大家都这样","sc":"relatives"},{"k":"传统","sc":"relatives"},{"k":"规矩","sc":"relatives"},{"k":"一直如此","sc":"relatives"},{"k":"别人家","sc":"relatives"},{"k":"每天打电话","sc":"boundaries"},{"k":"报平安","sc":"boundaries"},{"k":"不接电话","sc":"boundaries"},{"k":"多久联系","sc":"boundaries"},{"k":"必须回","sc":"boundaries"},{"k":"吵起来","sc":"boundaries"},{"k":"你闭嘴","sc":"boundaries"},{"k":"越说越气","sc":"boundaries"},{"k":"不让说","sc":"boundaries"},{"k":"提高声音","sc":"boundaries"},{"k":"骂人","sc":"boundaries"},{"k":"羞辱","sc":"boundaries"},{"k":"威胁","sc":"boundaries"},{"k":"废物","sc":"boundaries"},{"k":"没用","sc":"boundaries"},{"k":"不想聊","sc":"boundaries"},{"k":"说够了","sc":"boundaries"},{"k":"结束话题","sc":"boundaries"},{"k":"没精力","sc":"boundaries"},{"k":"改天再说","sc":"boundaries"},{"k":"刚吵完","sc":"boundaries"},{"k":"缓和一下","sc":"boundaries"},{"k":"道歉","sc":"boundaries"},{"k":"关系僵","sc":"boundaries"},{"k":"怎么开口","sc":"boundaries"}],"branches":[{"sc":"marriage","type":"对方开始提供具体人选","reply":"可以先把基本情况告诉我，我看看是否愿意认识。见面和后续发展我会自己决定。","next":"转入具体信息评估","boundary":"只讨论是否愿意认识，不预先承诺相亲或结婚。"},{"sc":"marriage","type":"对方重复催促","reply":"我知道你希望我认真对待感情。我会安排，但不打算每次都重复讨论同一个问题。","next":"重复边界","boundary":"不要为了结束对话承诺具体期限。"},{"sc":"marriage","type":"对方指责态度","reply":"我听到了你的建议，只是我会按自己的节奏判断。我们可以谈具体安排，不必评价我的态度。","next":"不进入自证","boundary":"若确有可执行安排，可另行讨论。"},{"sc":"marriage","type":"对方转为情绪施压","reply":"我知道你关心我，也谢谢你惦记。但感情这件事需要我自己决定，我们先不反复争这个问题。","next":"低投入回应或暂停","boundary":"保留关心表达，不以服从作为感谢的证明。"},{"sc":"relationship","type":"对方提出具体现实担忧","reply":"这些确实是可以提前考虑的现实问题。我们可以具体谈经济、支持网络和未来安排，但它们不等于必须否定这段关系。","next":"拆分具体议题","boundary":"认真评估真实风险，不必把所有担忧都视为偏见。"},{"sc":"relationship","type":"对方重复要求分手","reply":"我知道你不同意，但我不会因为重复要求就作出分手承诺。如果能谈具体担忧，我愿意听。","next":"重复边界","boundary":"如存在经济、居住或人身安全风险，优先做现实安全规划。"},{"sc":"relationship","type":"对方否定身份或伴侣","reply":"你可以需要时间理解，但请不要替我定义我的经历。我已经认真考虑过，不想每次都从头证明。","next":"不进入无限自证","boundary":"不要求用户当场说服父母。"},{"sc":"relationship","type":"对方表达无法接受","reply":"我听到你很难接受。我们可以先给彼此一点时间，但我不会通过否认自己的感情来解决这件事。","next":"承接情绪并暂停","boundary":"若对方有自伤威胁，按现实危机处理，联系可信任的人或当地紧急服务。"},{"sc":"career","type":"对方给出具体工作机会","reply":"谢谢你提供信息。你把岗位职责、薪资、地点和要求发给我，我会了解后决定要不要申请。","next":"评估具体条件","boundary":"感谢资源不等于承诺接受。"},{"sc":"career","type":"对方重复强调稳定","reply":"我知道稳定对你很重要。我会把稳定纳入考虑，也会一起评估收入、成长和生活成本。","next":"低投入回应","boundary":"可按实际选择标准继续，不需要争论哪一种价值观绝对正确。"},{"sc":"career","type":"对方指责不听话","reply":"我听到了你们的担心。听取意见和照着做是两回事，我会结合实际条件承担自己的选择。","next":"区分倾听与服从","boundary":"不必证明自己一定不会吃亏。"},{"sc":"career","type":"对方撤回支持或威胁后果","reply":"我知道选择有相应后果，我会尽量提前评估和准备。如果有具体支持条件，我们可以说清楚。","next":"评估现实后果","boundary":"若涉及经济依赖，应先评估可承受风险并准备替代方案。"},{"sc":"life_control","type":"对方提出具体担忧","reply":"谢谢你说具体情况。我会核实这件事，再结合实际相处判断，不会只凭一个标签决定交友。","next":"核实事实","boundary":"边界不意味着拒绝所有合理提醒。"},{"sc":"life_control","type":"对方重复命令","reply":"我知道你的立场了。是否继续交往我会自己判断；如果没有新的具体信息，我们先不重复这个话题。","next":"重复边界","boundary":"若用户仍未经济独立或存在现实控制风险，应选择安全可行的表达。"},{"sc":"life_control","type":"对方把不同意说成不懂事","reply":"我愿意考虑家里的感受，但这件事也关系到我的生活。我们可以谈具体担忧，不用把不同意见说成不懂事。","next":"拉回具体问题","boundary":"共同生活事项可协商，个人事项由用户自主判断。"},{"sc":"life_control","type":"对方强调担心安全","reply":"我理解你担心。我们可以约定必要的报平安方式，但不需要把所有行程和私人信息都实时汇报。","next":"协商有限信息共享","boundary":"若存在现实危险，可主动共享必要信息，但范围应清晰。"},{"sc":"lecture","type":"对方终于提出具体建议","reply":"这就具体多了。我会看一下这些步骤是否适合现在的情况，再决定先从哪一步开始。","next":"评估可执行性","boundary":"不必为了配合对话而接受所有建议。"},{"sc":"lecture","type":"对方继续空泛说教","reply":"嗯，我会认真生活，也会一步一步处理自己的事情。具体怎么做，我会结合实际情况安排。","next":"抽象对抽象/低投入","boundary":"这是一种减少消耗的选项，不必用来讽刺对方。"},{"sc":"lecture","type":"对方说你不愿意听","reply":"我听到了你的观点。只是如果没有具体做法，我们可能会一直重复；有具体建议我愿意讨论。","next":"确认对话目标","boundary":"避免把对方动机直接判定为恶意。"},{"sc":"lecture","type":"对方强调自己在分享经验","reply":"我知道你花了心思，也听到了你的经验。接下来我会结合自己的情况判断哪些适用。","next":"感谢但保留判断权","boundary":"不必否认对方投入，也不必承诺照做。"},{"sc":"repetition","type":"对方补充了新信息","reply":"如果是新的具体信息，我愿意听听。我们可以只讨论这个新情况。","next":"回到实质讨论","boundary":"重复边界不等于拒绝新事实。"},{"sc":"repetition","type":"对方继续重复原观点","reply":"我已经听明白你的意思了。我的考虑也说过了，今天先到这里。","next":"结束循环","boundary":"如果对方停止重复，可自然转回日常话题。"},{"sc":"repetition","type":"对方质疑你的态度","reply":"我不是为了作对。我只是有自己的判断。我们可以不同意，但不必一直争谁的态度有问题。","next":"不进入态度争论","boundary":"如果双方激动，优先暂停。"},{"sc":"repetition","type":"对方用冷淡或反讽结束","reply":"好，那我们先停一下。之后想聊日常或具体事情都可以，不必现在把问题争完。","next":"不追逐输赢","boundary":"若用户希望修复关系，可稍后发起普通交流。"},{"sc":"criticism","type":"对方指出具体行为","reply":"这件事可以具体谈。如果是我没做到的部分，我愿意说明原因，也会讨论怎么补救。","next":"处理事实责任","boundary":"承认具体行为不等于接受人格标签。"},{"sc":"criticism","type":"对方重复人格标签","reply":"我愿意讨论具体事情，但不接受用标签概括我。我们先停在这里，等能谈具体问题再继续。","next":"拒绝人格贬低","boundary":"不以更严重的标签反击。"},{"sc":"criticism","type":"对方转向你的语气","reply":"我可以调整表达方式，但希望原本的问题也能被讨论。我们先把事情说清楚。","next":"区分语气与议题","boundary":"若语气确实伤人，可就表达方式道歉，但不必撤回所有立场。"},{"sc":"criticism","type":"对方情绪升级或辱骂","reply":"我现在不继续接受辱骂。我们先暂停，等能够互相尊重地交流时再谈。","next":"暂停并保护自己","boundary":"出现威胁或现实危险时，优先安全而非继续说服。"},{"sc":"guilt","type":"对方提出具体需要帮助的事项","reply":"你把具体时间、费用或需要我做的事告诉我，我会看自己的能力和安排，尽量给你明确答复。","next":"具体化支持请求","boundary":"对实际照护需求可认真协商，不必把所有请求都当作情绪施压。"},{"sc":"guilt","type":"对方重复强调牺牲","reply":"我没有否认你们的付出，也感谢你们。但我们仍然可以对具体事情有不同意见。","next":"承认付出但不无限欠债","boundary":"不必否认父母的辛苦，也不必接受所有要求。"},{"sc":"guilt","type":"对方指责不感恩","reply":"我在乎你们，也愿意在能力范围内承担责任。但不同意某个决定不等于不感恩。","next":"分开感情与服从","boundary":"可以用具体关心行动表达关系，不必以改变决定证明爱。"},{"sc":"guilt","type":"对方哭泣或强烈失望","reply":"我听到你很难过。我也需要一点时间整理自己的想法，我们可以先暂停，之后再谈具体问题。","next":"承接情绪并暂停","boundary":"如果出现自伤威胁，联系现实中的支持者或紧急服务。"},{"sc":"money_duty","type":"对方提出明确家庭预算","reply":"我们可以按实际收入、必要支出和储蓄目标算一个可持续的额度，再约定多久复盘一次。","next":"具体协商预算","boundary":"建议把数字写清楚，避免每次在争执中临时决定。"},{"sc":"money_duty","type":"对方继续拿别人比较","reply":"我愿意讨论我们家实际需要，但不想按别人家的数字决定。我们还是看具体支出和我能承担多少。","next":"拒绝比较式预算","boundary":"避免用别人的经济情况推断用户应承担的额度。"},{"sc":"money_duty","type":"对方用不孝施压","reply":"我愿意讨论具体支持，但希望按实际能力和需求来安排，而不是用“不孝”来决定金额。","next":"回到具体责任","boundary":"如有明确赡养义务或法律问题，应另行核实当地规定。"},{"sc":"money_duty","type":"对方要求立即借款或担保","reply":"我不会在没有看清材料和风险前签字。请把信息给我，我需要时间核实再答复。","next":"延迟高风险决定","boundary":"不要因情绪压力在未理解合同前签署。"},{"sc":"privacy","type":"对方提出合理的具体问题","reply":"谢谢你关心。这个部分我可以告诉你一些必要情况；其他细节我想自己保留。","next":"有限度分享","boundary":"隐私边界可以灵活调整，不需要一刀切。"},{"sc":"privacy","type":"对方继续要求看手机或密码","reply":"我不会开放私人聊天记录。你如果担心某件具体事情，可以直接问我，我们谈具体问题。","next":"重申隐私边界","boundary":"若拒绝可能带来危险，优先考虑现实安全。"},{"sc":"privacy","type":"对方把隐私边界解释为不信任","reply":"我愿意保持亲近，但亲近不等于没有隐私。希望我们能同时保留联系和个人空间。","next":"分开亲密与透明","boundary":"可主动分享一部分近况以保持连接。"},{"sc":"privacy","type":"对方已把私事告诉亲戚","reply":"我希望以后先征求我的同意。已经说出去的部分请不要继续扩散，也不要再转发细节。","next":"提出具体后续请求","boundary":"若信息涉及安全风险，可寻求可信任者帮助。"},{"sc":"relatives","type":"父母愿意一起准备回答","reply":"可以准备一句简短真实的话，比如“目前有自己的安排，有进展会分享”，不用解释太多。","next":"准备低信息量回答","boundary":"避免为了面子编造会引发后续麻烦的细节。"},{"sc":"relatives","type":"对方重复强调家族面子","reply":"我知道你在意外界评价，但我需要按真实情况安排生活。别人的看法不能替我做决定。","next":"重申自主权","boundary":"在现实安全或经济风险较高时，公开程度可以谨慎安排。"},{"sc":"relatives","type":"对方指责你不给面子","reply":"我不是想让你难堪，只是不想在大家面前讨论私人问题。我们可以私下聊具体安排。","next":"私下讨论","boundary":"如有可能，可事先约定聚会中避免追问的信号。"},{"sc":"relatives","type":"饭桌追问持续升级","reply":"谢谢关心，这个话题我先不展开了。我们聊点别的吧。","next":"转场或离席","boundary":"用户可以选择暂时离开现场，不必在围问中证明边界合理。"},{"sc":"boundaries","type":"对方接受暂停","reply":"好，谢谢你愿意先停一下。我们之后可以正常聊别的，等合适的时候再讨论具体问题。","next":"结束当前轮次","boundary":"无需趁对方同意暂停时继续补充论证。"},{"sc":"boundaries","type":"对方不允许结束通话","reply":"我知道你还有话，但我现在要结束通话。我们可以之后再约时间谈。","next":"执行暂停","boundary":"如果对方可能采取现实报复，先确保安全再执行。"},{"sc":"boundaries","type":"对方把设边界说成不尊重","reply":"我尊重你，也需要自己的边界。我们可以意见不同，但我希望彼此都能有表达和暂停的空间。","next":"解释边界而不撤回","boundary":"不必为了证明尊重而放弃所有边界。"},{"sc":"boundaries","type":"出现威胁或即时危险","reply":"这时不要把普通话术当作解决方案。优先离开危险环境，联系可信任的人；若有即时人身危险，联系当地紧急服务。","next":"安全优先，不走普通话术分支","boundary":"不要鼓励用户独自对抗或继续激化对话。"}],"principles":[{"name":"抓住中心诉求","definition":"先判断当前话题的核心目标，例如催婚场景的核心诉求可能是“希望用户进入异性婚姻”，而非每个旁支指责都需要回应。"},{"name":"具体化追问","definition":"对方给出“积极一点、上心一点”等抽象要求时，询问可执行的下一步。"},{"name":"低投入回应","definition":"对方持续输出抽象说教时，用简短、礼貌、不承诺过多的话回应。"},{"name":"重复边界","definition":"对方重复相同观点时，平静重复自己的立场，不不断补充新解释。"},{"name":"不进入自证","definition":"对方把议题转成“你不懂事/不听话”时，区分具体问题与人格评价。"},{"name":"承接但不承担全部情绪","definition":"承认对方可能担心、失望或难过，但不承诺通过服从来消除所有情绪。"},{"name":"建议与决定权分离","definition":"感谢信息或帮助，但说明是否采纳由用户结合实际情况判断。"},{"name":"清晰具体的边界","definition":"说明不愿意讨论什么、希望对方怎么做，以及重复越界时自己会采取什么行动。"},{"name":"暂停而非升级","definition":"双方激动或出现辱骂时，暂停当前交流，必要时稍后修复。"},{"name":"真实意愿优先","definition":"话术必须能由用户真实说出口，不鼓励为了暂时安静而作出虚假承诺。"}]};
+STRATEGIES = STRATEGIES.concat(CORPUS.units);
+var TOPIC_KW = {};
+CORPUS.kw.forEach(function(e){ (TOPIC_KW[e.sc] = TOPIC_KW[e.sc] || []).push(e.k); });
+CORPUS.utt.forEach(function(e){ e.n = normalize(e.t); });
+var MAXSTAGE = {};
+STRATEGIES.forEach(function(u){ MAXSTAGE[u.sc] = Math.max(MAXSTAGE[u.sc]||0, u.stage); });
+// 手写策略的触发词并入主题词库，保留人工调校的情境路由能力
+STRATEGIES.forEach(function(u){
+  (TOPIC_KW[u.sc] = TOPIC_KW[u.sc] || []);
+  (u.kw || []).forEach(function(k){
+    if(TOPIC_KW[u.sc].indexOf(k) === -1) TOPIC_KW[u.sc].push(k);
+  });
+});
+
+/* =====================================================
+   状态与持久化
+   ===================================================== */
+var LS_KEY = 'ergen_session_v2';   // v2：v1 旧会话含已改名的情境键，直接弃用避免渲染崩溃
+var state = {
+  scenario: null,        // 当前情境 key
+  repeatCounts: {},      // 各情境出现次数
+  manualStage: 0,        // 手动阶段覆盖（0=自动）
+  msgs: [],              // 消息流
+  lastSuggest: null,     // {unit, tone}
+  lastUnitBySc: {},      // 各情境上一轮推荐的策略，用于去重降权
+  undoStack: []
+};
+
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
+function load(){
+  try{
+    var raw = localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    var s = JSON.parse(raw);
+    if(!s || !s.msgs) return;
+    // 防御性恢复：补齐缺失字段，丢弃引用了已不存在策略/情境的消息
+    state.scenario = SCENARIOS[s.scenario] ? s.scenario : null;
+    state.repeatCounts = s.repeatCounts || {};
+    state.manualStage = s.manualStage || 0;
+    state.lastUnitBySc = s.lastUnitBySc || {};
+    state.undoStack = s.undoStack || [];
+    state.msgs = s.msgs.filter(function(m){
+      if(!m || !m.role) return false;
+      if(m.role === 'sys' && m.type === 'suggest') return !!findUnit(m.unit);
+      if(m.role === 'sys' && m.type === 'fallback'){
+        m.candidates = (m.candidates || []).filter(function(k){ return !!SCENARIOS[k]; });
+        return m.candidates.length > 0;
+      }
+      return true;
+    });
+    if(s.lastSuggest && findUnit(s.lastSuggest.unit)){ state.lastSuggest = s.lastSuggest; }
+  }catch(e){}
+}
+function findUnit(id){
+  for(var i=0;i<STRATEGIES.length;i++){ if(STRATEGIES[i].id === id) return STRATEGIES[i]; }
+  return null;
+}
+
+/* =====================================================
+   匹配引擎
+   ===================================================== */
+function normalize(t){
+  return (t||'').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
+}
+function hitCount(kwList, text){
+  var n = 0;
+  for(var i=0;i<kwList.length;i++){
+    var k = kwList[i].toLowerCase();
+    if(k && text.indexOf(k) !== -1) n += Math.min(k.length, 3);
+  }
+  return n;
+}
+function matchScenario(text, forced){
+  var best = null, bestScore = 0, scores = {};
+  Object.keys(SCENARIOS).forEach(function(key){
+    var s = hitCount(TOPIC_KW[key] || [], text);
+    scores[key] = s;
+    if(forced && key === forced){ s += 10; }
+    if(s > bestScore){ bestScore = s; best = key; }
+  });
+  if(!best || bestScore < 1) return { scenario:null, scores:scores };
+  return { scenario:best, scores:scores };
+}
+function suggestedStage(sc){
+  if(state.manualStage) return state.manualStage;
+  var seen = state.repeatCounts[sc] || 0;
+  return Math.min(seen + 1, MAXSTAGE[sc] || 4);
+}
+function pickUnit(sc, text){
+  var stage = suggestedStage(sc);
+  var lastId = (state.lastUnitBySc && state.lastUnitBySc[sc]) || null;
+  var cands = STRATEGIES.filter(function(u){ return u.sc === sc; });
+  var best = null, bestScore = -1;
+  cands.forEach(function(u){
+    var h = hitCount(u.kw || [], text);
+    var s = h * 4;
+    if(u.stage === stage) s += 4;
+    if(u.id === lastId) s -= 6;   // 避免同一情境连续推荐同一条策略，推动阶段前进
+    if(s > bestScore){ bestScore = s; best = u; }
+  });
+  return best;
+}
+function match(text, forcedSc){
+  var t = normalize(text);
+  // 语料原话优先：240 条家长原话包含命中即直取对应策略
+  for(var i=0;i<CORPUS.utt.length;i++){
+    var e = CORPUS.utt[i];
+    if(e.n.length >= 4 && t.indexOf(e.n) !== -1){
+      var hu = getUnit(e.id);
+      if(hu) return { sc:hu.sc, unit:hu };
+    }
+  }
+  var r = matchScenario(t, forcedSc);
+  if(!r.scenario) return { sc:null, unit:findUnit('GEN01'), generic:true };
+  var unit = pickUnit(r.scenario, t);
+  if(!unit) return { sc:null, unit:findUnit('GEN01'), generic:true };
+  return { sc:r.scenario, unit:unit };
+}
+
+/* =====================================================
+   视图切换
+   ===================================================== */
+var $ = function(id){ return document.getElementById(id); };
+var views = { home:$('home'), chat:$('chat'), guide:$('guide') };
+function show(name){
+  Object.keys(views).forEach(function(k){ views[k].hidden = (k !== name); });
+  window.scrollTo(0,0);
+}
+
+/* ---------- 首页 ---------- */
+function renderHome(){
+  var grid = $('sc-grid');
+  grid.innerHTML = '';
+  Object.keys(SCENARIOS).forEach(function(key){
+    var sc = SCENARIOS[key];
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + sc.color + ';display:inline-block;"></span>' + sc.name;
+    b.onclick = function(){ startChat(key); };
+    grid.appendChild(b);
+  });
+}
+function startChat(scKey){
+  state.scenario = scKey;
+  show('chat');
+  renderStageBar();
+  if(state.msgs.length === 0){
+    pushMsg({ role:'info', text:'已进入「' + SCENARIOS[scKey].name + '」情境' });
+    pushMsg({ role:'sys', type:'plain', text:'把她说过的原话粘贴进来，我会直接给出应对；识别不了时会用通用回复接住。每轮之后阶段自动推进，也可以点上方标签手动切换。' });
+  }
+  renderMsgs(); save();
+}
+
+/* ---------- 阶段条 ---------- */
+function renderStageBar(){
+  var bar = $('stage-bar');
+  bar.innerHTML = '';
+  var auto = document.createElement('button');
+  auto.className = 'stage-chip auto' + (state.manualStage === 0 ? ' on' : '');
+  auto.textContent = '阶段：自动';
+  auto.onclick = function(){ state.manualStage = 0; renderStageBar(); save(); };
+  bar.appendChild(auto);
+  STAGES.forEach(function(s){
+    var b = document.createElement('button');
+    b.className = 'stage-chip' + (state.manualStage === s.key ? ' on' : '');
+    b.textContent = s.name;
+    b.title = s.desc;
+    b.onclick = function(){ state.manualStage = s.key; renderStageBar(); save(); };
+    bar.appendChild(b);
+  });
+}
+
+/* ---------- 消息渲染 ---------- */
+function pushMsg(m){ state.msgs.push(m); }
+function renderMsgs(){
+  var box = $('msgs');
+  box.innerHTML = '';
+  state.msgs.forEach(function(m, idx){
+    if(m.role === 'info'){
+      var d = document.createElement('div');
+      d.className = 'm-info'; d.innerHTML = '<span>' + esc(m.text) + '</span>';
+      box.appendChild(d);
+    } else if(m.role === 'parent'){
+      var row = document.createElement('div');
+      row.className = 'm-row rev';
+      row.innerHTML = '<div class="avatar parent">她</div>';
+      var b = document.createElement('div');
+      b.className = 'bubble parent'; b.textContent = m.text;
+      row.appendChild(b);
+      box.appendChild(row);
+    } else if(m.role === 'sys'){
+      if(m.type === 'plain'){
+        var row2 = document.createElement('div');
+        row2.className = 'm-row';
+        row2.innerHTML = '<div class="avatar sys">策</div>';
+        var b2 = document.createElement('div');
+        b2.className = 'bubble self plain'; b2.textContent = m.text;
+        row2.appendChild(b2);
+        box.appendChild(row2);
+      } else if(m.type === 'suggest'){
+        var unit = getUnit(m.unit);
+        var row3 = document.createElement('div');
+        row3.className = 'm-row';
+        var wrap = document.createElement('div');
+        wrap.style.maxWidth = '80%';
+        var lb = document.createElement('div');
+        lb.className = 'tone-label';
+        lb.innerHTML = '建议回复 · <b>' + TONES[m.tone] + '</b> · ' + unit.name;
+        wrap.appendChild(lb);
+        if(m.generic){
+          var gn = document.createElement('div');
+          gn.className = 'generic-note';
+          gn.textContent = '不太符合，使用通用回复';
+          wrap.appendChild(gn);
+        }
+        var b3 = document.createElement('div');
+        b3.className = 'bubble self';
+        b3.textContent = unit.r[m.tone];
+        b3.onclick = function(){ openSheet(unit, m.tone); };
+        wrap.appendChild(b3);
+        var acts = document.createElement('div');
+        acts.className = 'bubble-actions';
+        var aCopy = document.createElement('a');
+        aCopy.textContent = '复制';
+        aCopy.onclick = function(e){ e.stopPropagation(); copyText(unit.r[m.tone]); };
+        var aAlt = document.createElement('a');
+        aAlt.textContent = '换一种说法';
+        aAlt.onclick = function(e){
+          e.stopPropagation();
+          var next = TONE_ORDER[(TONE_ORDER.indexOf(m.tone) + 1) % 3];
+          m.tone = next;
+          if(state.lastSuggest && state.lastSuggest.unit === m.unit) state.lastSuggest.tone = next;
+          renderMsgs(); save();
+          toast('已切换为' + TONES[next]);
+        };
+        acts.appendChild(aCopy); acts.appendChild(aAlt);
+        wrap.appendChild(acts);
+        row3.appendChild(wrap);
+        box.appendChild(row3);
+      }
+    }
+  });
+  box.scrollTop = box.scrollHeight;
+}
+function getUnit(id){
+  for(var i=0;i<STRATEGIES.length;i++){ if(STRATEGIES[i].id === id) return STRATEGIES[i]; }
+  return STRATEGIES[0];
+}
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ---------- 发送与处理 ---------- */
+function snapshot(){
+  state.undoStack.push(JSON.stringify({
+    scenario:state.scenario, repeatCounts:state.repeatCounts,
+    manualStage:state.manualStage, msgs:state.msgs, lastSuggest:state.lastSuggest,
+    lastUnitBySc:state.lastUnitBySc
+  }));
+  if(state.undoStack.length > 30) state.undoStack.shift();
+}
+function handleSend(){
+  var input = $('input');
+  var text = input.value.trim();
+  if(!text) return;
+  input.value = ''; input.style.height = 'auto';
+  snapshot();
+  pushMsg({ role:'parent', text:text });
+  var r = match(text, null);
+  applyMatch(r.sc, r.unit, text, r.generic);
+  renderMsgs(); save();
+}
+function applyMatch(sc, unit, text, generic){
+  if(generic || !sc){
+    // 未识别具体情境：直接给通用回复，不打断对话
+    var gtone = 'g';
+    pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:gtone, generic:true });
+    state.lastSuggest = { unit:unit.id, tone:gtone };
+    return;
+  }
+  state.scenario = sc;
+  state.repeatCounts[sc] = (state.repeatCounts[sc] || 0) + 1;
+  var stage = suggestedStage(sc);
+  var stageInfo = STAGES[stage-1];
+  pushMsg({ role:'info', text:'「' + SCENARIOS[sc].name + '」 · 建议：' + stageInfo.name + '（' + stageInfo.desc + '）' });
+  var tone = DEFAULT_TONE[stage];
+  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:tone });
+  state.lastSuggest = { unit:unit.id, tone:tone };
+  if(!state.lastUnitBySc) state.lastUnitBySc = {};
+  state.lastUnitBySc[sc] = unit.id;
+}
+/* ---------- 快捷操作 ---------- */
+function toast(text){
+  var t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 1400);
+}
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }, function(){ fallbackCopy(text); });
+  } else { fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('已复制'); }catch(e){ toast('复制失败，请长按手动复制'); }
+  document.body.removeChild(ta);
+}
+function undo(){
+  if(!state.undoStack.length){ toast('没有可撤销的操作'); return; }
+  var s = JSON.parse(state.undoStack.pop());
+  state.scenario = s.scenario; state.repeatCounts = s.repeatCounts;
+  state.manualStage = s.manualStage; state.msgs = s.msgs; state.lastSuggest = s.lastSuggest;
+  state.lastUnitBySc = s.lastUnitBySc || {};
+  renderMsgs(); renderStageBar(); save();
+}
+function restart(){
+  askConfirm('重新开始将清空当前模拟对话，确定吗？', function(){
+    state.scenario = null; state.repeatCounts = {}; state.manualStage = 0;
+    state.msgs = []; state.lastSuggest = null; state.undoStack = []; state.lastUnitBySc = {};
+    show('home'); save();
+  });
+}
+function clearLocal(){
+  askConfirm('将清除本地保存的全部对话记录与设置，确定吗？', function(){
+    try{ localStorage.removeItem(LS_KEY); localStorage.removeItem('ergen_session_v1'); }catch(e){}
+    state = { scenario:null, repeatCounts:{}, manualStage:0, msgs:[], lastSuggest:null, undoStack:[], lastUnitBySc:{} };
+    show('home'); toast('已清除本地记录');
+  });
+}
+
+/* ---------- 应用内确认框（沙箱 iframe 拦截原生 confirm） ---------- */
+var cboxCb = null;
+function askConfirm(text, cb){
+  $('cbox-text').textContent = text;
+  cboxCb = cb;
+  $('cbox').hidden = false;
+}
+function closeCbox(){ $('cbox').hidden = true; cboxCb = null; }
+
+/* ---------- 攻略弹层 ---------- */
+var sheetUnit = null, sheetTone = 'g';
+function openSheet(unit, tone){
+  if(!unit) return;
+  sheetUnit = unit; sheetTone = tone || 'g';
+  renderSheet();
+  $('mask').hidden = false; $('sheet').hidden = false;
+}
+function closeSheet(){ $('mask').hidden = true; $('sheet').hidden = true; }
+function renderSheet(){
+  var u = sheetUnit;
+  $('sheet-title').textContent = u.name;
+  var tabs = $('tone-tabs');
+  tabs.innerHTML = '';
+  TONE_ORDER.forEach(function(t){
+    var b = document.createElement('button');
+    b.className = 'tone-tab' + (t === sheetTone ? ' on' : '');
+    b.textContent = TONES[t];
+    b.onclick = function(){ sheetTone = t; renderSheet(); syncLastSuggestTone(t); };
+    tabs.appendChild(b);
+  });
+  var sc = SCENARIOS[u.sc];
+  var st = STAGES[u.stage-1];
+  var html = '';
+  html += '<div style="margin-bottom:12px;">'
+       + '<span class="tag" style="background:' + sc.color + ';">' + sc.name + '</span> '
+       + '<span class="tag" style="background:#576b95;">阶段' + u.stage + ' · ' + st.name + '</span>'
+       + '</div>';
+  html += '<div class="sheet-reply" id="sheet-reply">' + esc(u.r[sheetTone]) + '</div>';
+  html += '<button class="btn btn-ghost sheet-copy" id="sheet-copy-btn">复制这条回复</button>';
+  html += gField('适合什么情况', u.fit);
+  html += gField('当前要解决的核心问题', u.core);
+  html += gField('为什么这样说', u.why);
+  html += gField('她可能怎么接 / 下一步', u.next);
+  if(u.alt) html += gField('更省力的替代说法', u.alt);
+  if(u.caution) html += gField('注意事项', u.caution);
+  if(u.examples && u.examples.length){
+    html += '<div class="g-field"><span class="lb">她常这么说（语料原话）</span>';
+    u.examples.slice(0,4).forEach(function(x){
+      html += '<div class="g-reply" style="color:var(--ink2);">' + esc(x) + '</div>';
+    });
+    html += '</div>';
+  }
+  var brs = CORPUS.branches.filter(function(b){ return b.sc === u.sc; });
+  if(brs.length){
+    html += '<div class="g-field"><span class="lb">她可能这样接（分支预案）</span>';
+    brs.slice(0,4).forEach(function(b){
+      html += '<div class="g-reply"><b>' + esc(b.type) + '</b><br>' + esc(b.reply)
+           +  '<br><span style="font-size:12px;color:#a0a0a0;">边界：' + esc(b.boundary) + '</span></div>';
+    });
+    html += '</div>';
+  }
+  $('sheet-body').innerHTML = html;
+  var cb = $('sheet-copy-btn');
+  if(cb) cb.onclick = function(){ copyText(u.r[sheetTone]); };
+}
+function gField(label, text){
+  if(!text) return '';
+  return '<div class="g-field"><span class="lb">' + label + '</span>' + esc(text) + '</div>';
+}
+function syncLastSuggestTone(t){
+  if(state.lastSuggest && state.lastSuggest.unit === sheetUnit.id){
+    state.lastSuggest.tone = t;
+    for(var i = state.msgs.length - 1; i >= 0; i--){
+      if(state.msgs[i].role === 'sys' && state.msgs[i].type === 'suggest' && state.msgs[i].unit === sheetUnit.id){
+        state.msgs[i].tone = t; break;
+      }
+    }
+    renderMsgs(); save();
+  }
+}
+
+/* ---------- 攻略库 ---------- */
+function renderGuide(){
+  var body = $('guide-body');
+  body.innerHTML = '';
+  var pri = document.createElement('div');
+  pri.className = 'home-note';
+  var ph = '<b>十条应对原则</b><br><br>';
+  CORPUS.principles.forEach(function(p, i){
+    ph += '<b style="color:var(--green);">' + (i+1) + '. ' + esc(p.name) + '</b>　' + esc(p.definition) + '<br><br>';
+  });
+  pri.innerHTML = ph;
+  body.appendChild(pri);
+  Object.keys(SCENARIOS).forEach(function(key){
+    var sc = SCENARIOS[key];
+    var sec = document.createElement('div');
+    sec.className = 'g-sc';
+    sec.innerHTML = '<div class="g-sc-title"><span style="width:10px;height:10px;border-radius:50%;background:' + sc.color + ';display:inline-block;"></span>' + sc.name + '<span style="font-weight:400;color:var(--ink2);font-size:13px;">' + sc.chip + '</span></div>';
+    var units = STRATEGIES.filter(function(u){ return u.sc === key; });
+    units.forEach(function(u){
+      var card = document.createElement('div');
+      card.className = 'g-unit';
+      var head = document.createElement('div');
+      head.className = 'g-unit-head';
+      head.innerHTML = '<span class="tag" style="background:#576b95;font-size:11px;">阶段' + u.stage + '</span><span class="nm">' + esc(u.name) + '</span><span class="arr">›</span>';
+      head.onclick = function(){ card.classList.toggle('open'); };
+      var bd = document.createElement('div');
+      bd.className = 'g-unit-body';
+      var h = '';
+      ['g','b','f'].forEach(function(t){
+        h += '<div class="g-reply"><b>' + TONES[t] + '</b><br>' + esc(u.r[t]) + '</div>';
+      });
+      h += gField('适合什么情况', u.fit);
+      h += gField('核心问题', u.core);
+      h += gField('为什么这样说', u.why);
+      h += gField('她可能怎么接 / 下一步', u.next);
+      if(u.alt) h += gField('替代说法', u.alt);
+      bd.innerHTML = h;
+      card.appendChild(head); card.appendChild(bd);
+      sec.appendChild(card);
+    });
+    body.appendChild(sec);
+  });
+}
+
+/* ---------- 输入框自适应 ---------- */
+function autosize(){
+  var input = $('input');
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+}
+
+/* ---------- 事件绑定 ---------- */
+function bind(){
+  $('btn-start-free').onclick = function(){ startChat(SCENARIOS.marriage ? 'marriage' : null); state.scenario = null; };
+  $('btn-guide').onclick = function(){ renderGuide(); show('guide'); };
+  $('btn-clear').onclick = clearLocal;
+  $('btn-back').onclick = function(){ show('home'); save(); };
+  $('btn-guide-back').onclick = function(){ show('home'); };
+  $('btn-restart').onclick = restart;
+  $('btn-undo').onclick = undo;
+  $('send').onclick = handleSend;
+  $('input').addEventListener('input', autosize);
+  $('input').addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); }
+  });
+  $('sheet-close').onclick = closeSheet;
+  $('mask').onclick = closeSheet;
+  $('cbox-yes').onclick = function(){ var cb = cboxCb; closeCbox(); if(cb) cb(); };
+  $('cbox-no').onclick = closeCbox;
+}
+
+/* ---------- 启动 ---------- */
+load();
+renderHome();
+renderStageBar();
+bind();
+if(state.msgs.length > 0 && state.scenario){
+  show('chat'); renderMsgs();
+}
+</script>
+</body>
+</html>
