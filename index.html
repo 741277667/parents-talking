@@ -1087,6 +1087,22 @@ function renderGuide(){
   });
   pri.innerHTML = ph;
   body.appendChild(pri);
+  var stg = document.createElement('div');
+  stg.className = 'home-note';
+  var STAGE_INTRO = [
+    ['S1','确认诉求','先确认对方想讨论什么；可以承认关心，但不立即接受要求。','转入具体评估：哪些可行、哪些不适合。'],
+    ['S2','引向具体','把抽象要求转为行动、事实、时间或可验证的担忧。','针对具体内容讨论，不必继续抽象争论。'],
+    ['S3','简短周旋','回应中心议题，不回应所有旁支，不重复自证。','说明可调整语气，但希望回到具体问题；必要时转S4。'],
+    ['S4','暂停/结束','明确当前无法继续，结束当下讨论，保留以后正常交流空间。','结束当前轮次；后续可恢复日常话题。']
+  ];
+  var sh = '<b>四个阶段</b><br><br>';
+  STAGE_INTRO.forEach(function(s){
+    sh += '<b style="color:var(--green);">' + s[0] + '　' + s[1] + '</b><br>'
+       +  esc(s[2]) + '<br>'
+       +  '<span style="font-size:12px;color:var(--ink2);">对方重复时：' + esc(s[3]) + '</span><br><br>';
+  });
+  stg.innerHTML = sh;
+  body.appendChild(stg);
   Object.keys(SCENARIOS).forEach(function(key){
     var sc = SCENARIOS[key];
     var sec = document.createElement('div');
