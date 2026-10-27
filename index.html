@@ -168,6 +168,15 @@
   }
   .toast.show{opacity:1;}
 
+  /* AI 设置 */
+  .ai-body{padding:16px 16px 40px; overflow-y:auto; flex:1;}
+  .ai-toggle{display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px;}
+  .ai-toggle input{width:22px; height:22px;}
+  .ai-note{font-size:12px; color:var(--ink2); background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:16px;}
+  .ai-field{margin-bottom:14px;}
+  .ai-field label{display:block; font-size:13px; color:var(--ink2); margin-bottom:6px;}
+  .ai-field input, .ai-field select{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:15px; font-family:inherit; background:#fff; outline:none;}
+
   /* 应用内确认框（沙箱 iframe 会拦截原生 confirm） */
   #cbox{position:absolute; inset:0; z-index:40; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:32px;}
   #cbox[hidden]{display:none;}
@@ -200,6 +209,8 @@
       <p class="cover-hint">点击回复气泡，可查看具体攻略</p>
       <p class="sec-title">或者</p>
       <button class="btn btn-ghost" id="btn-guide" style="width:100%;">看看应对攻略</button>
+      <button class="btn btn-ghost" id="btn-ai-home" style="width:100%; margin-top:10px;">接入 AI 识别（可选）</button>
+      <p class="cover-hint" id="ai-status"></p>
       <div class="home-foot">
         <span class="foot-mini">v1.4 · 95 条策略 · 语料库 v1.1（480 原话）· 全部本地运行</span>
         <button class="icon-btn" id="btn-clear" style="color:var(--danger);">清除本地记录</button>
@@ -214,6 +225,7 @@
         <button class="back" id="btn-back" aria-label="返回">‹</button>
         <div class="chat-title" id="chat-title">耳根清净</div>
         <div class="head-actions">
+          <button class="icon-btn" id="btn-ai">AI 关</button>
           <button class="icon-btn" id="btn-undo">撤销</button>
           <button class="icon-btn" id="btn-restart">重新开始</button>
         </div>
@@ -235,6 +247,40 @@
       <span style="width:34px;"></span>
     </div>
     <div class="guide-body" id="guide-body"></div>
+  </section>
+
+  <!-- AI 设置 -->
+  <section class="view" id="ai" hidden>
+    <div class="guide-head">
+      <button class="back" id="btn-ai-back" aria-label="返回">‹</button>
+      <h2>接入 AI（可选）</h2>
+      <span style="width:34px;"></span>
+    </div>
+    <div class="ai-body">
+      <div class="ai-toggle">
+        <div><b>启用 AI 识别</b><br><span style="font-size:12px;color:var(--ink2);">关闭后全部在本机规则匹配</span></div>
+        <input type="checkbox" id="ai-enabled">
+      </div>
+      <p class="ai-note">开启后，她的话会发送给你选择的 AI 供应商用于识别情境与意图；密钥仅保存在此浏览器，本站无服务器、不存储任何内容。规则引擎始终作为兜底。</p>
+      <div class="ai-field"><label>供应商</label>
+        <select id="ai-provider">
+          <option value="deepseek">DeepSeek</option>
+          <option value="moonshot">Kimi（月之暗面）</option>
+          <option value="zhipu">智谱 GLM</option>
+          <option value="openai">OpenAI</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="custom">自定义（OpenAI 兼容）</option>
+        </select>
+      </div>
+      <div class="ai-field"><label>接口地址（Base URL）</label><input id="ai-url" placeholder="https://api.deepseek.com/v1"></div>
+      <div class="ai-field"><label>API Key</label><input id="ai-key" type="password" placeholder="sk-…"></div>
+      <div class="ai-field"><label>模型</label><input id="ai-model" placeholder="deepseek-chat"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" id="btn-ai-test" style="flex:1;">测试连接</button>
+        <button class="btn btn-primary" id="btn-ai-save" style="flex:1;">保存</button>
+      </div>
+      <p id="ai-test-result" style="font-size:13px; margin-top:10px; color:var(--ink2);"></p>
+    </div>
   </section>
 
   <div id="mask" hidden></div>
@@ -678,6 +724,141 @@ function findUnit(id){
 }
 
 /* =====================================================
+   AI 接入层（可选 · 用户自备 Key · 失败自动回落规则引擎）
+   ===================================================== */
+var AI_LS_KEY = 'ergen_ai_v1';
+var AI_PRESETS = {
+  deepseek:  { url:'https://api.deepseek.com/v1', model:'deepseek-chat' },
+  moonshot:  { url:'https://api.moonshot.cn/v1', model:'moonshot-v1-8k' },
+  zhipu:     { url:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-flash' },
+  openai:    { url:'https://api.openai.com/v1', model:'gpt-4o-mini' },
+  openrouter:{ url:'https://openrouter.ai/api/v1', model:'openai/gpt-4o-mini' },
+  custom:    { url:'', model:'' }
+};
+var AI = { enabled:false, provider:'deepseek', baseUrl:'', apiKey:'', model:'' };
+var aiPending = false;
+var aiSysPrompt = null;
+
+function loadAI(){
+  try{
+    var raw = localStorage.getItem(AI_LS_KEY);
+    if(raw){ var s = JSON.parse(raw); if(s && typeof s === 'object'){ AI = s; } }
+  }catch(e){}
+}
+function saveAI(){ try{ localStorage.setItem(AI_LS_KEY, JSON.stringify(AI)); }catch(e){} }
+function aiActive(){
+  return !!(AI.enabled && AI.baseUrl && AI.apiKey && AI.model);
+}
+function updateAiUi(){
+  var on = aiActive();
+  var label = aiPending ? 'AI…' : (on ? 'AI 开' : 'AI 关');
+  var b = $('btn-ai'); if(b) b.textContent = label;
+  var st = $('ai-status');
+  if(st){
+    if(!AI.baseUrl || !AI.apiKey) st.textContent = 'AI 识别：未配置';
+    else st.textContent = 'AI 识别：' + (on ? '已开启 · ' + AI.model : '已关闭（配置已保存）');
+  }
+}
+function openAIView(){
+  aiReturnView = (currentView === 'ai') ? 'home' : currentView;
+  $('ai-provider').value = AI.provider || 'deepseek';
+  $('ai-url').value = AI.baseUrl || '';
+  $('ai-key').value = AI.apiKey || '';
+  $('ai-model').value = AI.model || '';
+  $('ai-enabled').checked = !!AI.enabled;
+  $('ai-test-result').textContent = '';
+  show('ai');
+}
+function aiChat(messages, maxTokens){
+  var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = setTimeout(function(){ if(ctrl) ctrl.abort(); }, 20000);
+  return fetch(AI.baseUrl.replace(/\/+$/,'') + '/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + AI.apiKey },
+    body: JSON.stringify({ model:AI.model, messages:messages, temperature:0.2, max_tokens:maxTokens||400 }),
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function(r){
+    clearTimeout(timer);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(j){
+    clearTimeout(timer);
+    var c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if(!c) throw new Error('空响应');
+    return c;
+  }).catch(function(e){
+    clearTimeout(timer);
+    throw e;
+  });
+}
+function buildAISystemPrompt(){
+  if(aiSysPrompt) return aiSysPrompt;
+  var lines = [
+    '你是亲子沟通模拟工具"耳根清净"的分类器。用户会给你一段家长（她）说的话，你的任务：',
+    '1. 判断这句话属于哪个情境（scenario）；2. 判断对话处于哪个阶段（stage，1确认诉求/2引向具体/3简短周旋/4暂停结束）；',
+    '3. 选出最合适的一条既有策略（strategy_id）；4. 用一句话分析她说这句话的核心诉求或目的（intent）。',
+    '只输出一个 JSON 对象：{"scenario":"topic键","stage":1,"strategy_id":"策略ID","intent":"一句话"}，不要输出任何其他内容。','',
+    '情境 topic 键：'
+  ];
+  Object.keys(SCENARIOS).forEach(function(k){ lines.push('- ' + k + '：' + SCENARIOS[k].name); });
+  lines.push('');
+  lines.push('可选策略ID（按情境分组）：');
+  Object.keys(SCENARIOS).forEach(function(k){
+    var us = STRATEGIES.filter(function(u){ return u.sc === k; });
+    if(!us.length) return;
+    lines.push(k + '：' + us.map(function(u){
+      return u.id + '(' + String(u.name).replace(/["\']/g,'') + ',阶段' + u.stage + ')';
+    }).join('、'));
+  });
+  aiSysPrompt = lines.join('\n');
+  return aiSysPrompt;
+}
+function aiClassify(text){
+  return aiChat([
+    { role:'system', content: buildAISystemPrompt() },
+    { role:'user', content: '她说的原话：' + text + '\n请只返回 JSON。' }
+  ], 350).then(function(content){
+    var m = content.match(/\{[\s\S]*\}/);
+    if(!m) return null;
+    var j;
+    try{ j = JSON.parse(m[0]); }catch(e){ return null; }
+    var sid = j.strategy_id || j.strategyId;
+    var unit = sid ? (findUnit('C-' + sid) || findUnit(sid)) : null;
+    if(unit) return { sc:unit.sc, unit:unit, analysis:j.intent || '' };
+    var sc = (j.scenario && SCENARIOS[j.scenario]) ? j.scenario : null;
+    if(sc){
+      var st = parseInt(j.stage, 10);
+      var u2 = pickUnit(sc, normalize(text), (st >= 1 && st <= 4) ? st : null);
+      if(u2) return { sc:sc, unit:u2, analysis:j.intent || '' };
+    }
+    return null;
+  });
+}
+function aiProcess(text){
+  aiPending = true; updateAiUi();
+  toast('AI 识别中…');
+  aiClassify(text).then(function(res){
+    aiPending = false; updateAiUi();
+    if(res){
+      applyMatch(res.sc, res.unit, text, false, res.analysis, true);
+    } else {
+      toast('AI 未识别，使用规则匹配');
+      var r = match(text, null);
+      if(r.uncertain) pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
+      else applyMatch(r.sc, r.unit, text);
+    }
+    renderMsgs(); save();
+  }).catch(function(){
+    aiPending = false; updateAiUi();
+    toast('AI 调用失败，已用规则匹配');
+    var r = match(text, null);
+    if(r.uncertain) pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
+    else applyMatch(r.sc, r.unit, text);
+    renderMsgs(); save();
+  });
+}
+
+/* =====================================================
    匹配引擎
    ===================================================== */
 function normalize(t){
@@ -707,8 +888,8 @@ function suggestedStage(sc){
   var seen = state.repeatCounts[sc] || 0;
   return Math.min(seen + 1, MAXSTAGE[sc] || 4);
 }
-function pickUnit(sc, text){
-  var stage = suggestedStage(sc);
+function pickUnit(sc, text, forcedStage){
+  var stage = forcedStage || suggestedStage(sc);
   var lastId = (state.lastUnitBySc && state.lastUnitBySc[sc]) || null;
   var cands = STRATEGIES.filter(function(u){ return u.sc === sc; });
   var best = null, bestScore = -1;
@@ -742,9 +923,12 @@ function match(text, forcedSc){
    视图切换
    ===================================================== */
 var $ = function(id){ return document.getElementById(id); };
-var views = { home:$('home'), chat:$('chat'), guide:$('guide') };
+var views = { home:$('home'), chat:$('chat'), guide:$('guide'), ai:$('ai') };
+var currentView = 'home';
+var aiReturnView = 'home';
 function show(name){
   Object.keys(views).forEach(function(k){ views[k].hidden = (k !== name); });
+  currentView = name;
   window.scrollTo(0,0);
 }
 
@@ -837,7 +1021,7 @@ function renderMsgs(){
         var b3 = document.createElement('div');
         b3.className = 'bubble self';
         b3.textContent = unit.r[m.tone];
-        b3.onclick = function(){ openSheet(unit, m.tone); };
+        b3.onclick = function(){ openSheet(unit, m.tone, m); };
         wrap.appendChild(b3);
         var acts = document.createElement('div');
         acts.className = 'bubble-actions';
@@ -910,6 +1094,11 @@ function handleSend(){
   input.value = ''; input.style.height = 'auto';
   snapshot();
   pushMsg({ role:'parent', text:text });
+  if(aiPending){ renderMsgs(); return; }
+  if(aiActive()){
+    aiProcess(text);
+    return;
+  }
   var r = match(text, null);
   if(r.uncertain){
     pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
@@ -918,11 +1107,11 @@ function handleSend(){
   }
   renderMsgs(); save();
 }
-function applyMatch(sc, unit, text, generic){
+function applyMatch(sc, unit, text, generic, aiAnalysis, fromAI){
   if(generic || !sc){
     // 未识别具体情境：直接给通用回复，不打断对话
     var gtone = 'g';
-    pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:gtone, generic:true });
+    pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:gtone, generic:true, ai:aiAnalysis||'' });
     state.lastSuggest = { unit:unit.id, tone:gtone };
     return;
   }
@@ -930,9 +1119,9 @@ function applyMatch(sc, unit, text, generic){
   state.repeatCounts[sc] = (state.repeatCounts[sc] || 0) + 1;
   var stage = suggestedStage(sc);
   var stageInfo = STAGES[stage-1];
-  pushMsg({ role:'info', text:'「' + SCENARIOS[sc].name + '」 · 建议：' + stageInfo.name + '（' + stageInfo.desc + '）' });
+  pushMsg({ role:'info', text:(fromAI ? 'AI 识别 · ' : '') + '「' + SCENARIOS[sc].name + '」 · 建议：' + stageInfo.name + '（' + stageInfo.desc + '）' });
   var tone = DEFAULT_TONE[stage];
-  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:tone });
+  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:tone, ai:aiAnalysis||'' });
   state.lastSuggest = { unit:unit.id, tone:tone };
   if(!state.lastUnitBySc) state.lastUnitBySc = {};
   state.lastUnitBySc[sc] = unit.id;
@@ -1005,9 +1194,11 @@ function closeCbox(){ $('cbox').hidden = true; cboxCb = null; }
 
 /* ---------- 攻略弹层 ---------- */
 var sheetUnit = null, sheetTone = 'g';
-function openSheet(unit, tone){
+var sheetAi = '';
+function openSheet(unit, tone, msg){
   if(!unit) return;
   sheetUnit = unit; sheetTone = tone || 'g';
+  sheetAi = (msg && msg.ai) || '';
   renderSheet();
   $('mask').hidden = false; $('sheet').hidden = false;
 }
@@ -1057,6 +1248,7 @@ function renderSheet(){
     html += '</div>';
   }
   $('sheet-body').innerHTML = html;
+  if(sheetAi) html = gField('AI 意图分析', sheetAi) + html;
   var cb = $('sheet-copy-btn');
   if(cb) cb.onclick = function(){ copyText(u.r[sheetTone]); };
 }
@@ -1161,13 +1353,49 @@ function bind(){
   $('mask').onclick = closeSheet;
   $('cbox-yes').onclick = function(){ var cb = cboxCb; closeCbox(); if(cb) cb(); };
   $('cbox-no').onclick = closeCbox;
+  $('btn-ai-home').onclick = openAIView;
+  $('btn-ai').onclick = openAIView;
+  $('btn-ai-back').onclick = function(){ show(aiReturnView); updateAiUi(); };
+  $('ai-provider').onchange = function(){
+    var p = AI_PRESETS[$('ai-provider').value];
+    if(p){ $('ai-url').value = p.url; $('ai-model').value = p.model; }
+  };
+  $('btn-ai-test').onclick = function(){
+    readAISettings();
+    var res = $('ai-test-result');
+    if(!AI.baseUrl || !AI.apiKey || !AI.model){ res.textContent = '请先填写接口地址、Key 和模型。'; res.style.color = 'var(--danger)'; return; }
+    res.textContent = '测试中…'; res.style.color = 'var(--ink2)';
+    var bak = JSON.parse(JSON.stringify(AI));
+    aiChat([{ role:'user', content:'回复"连接成功"四个字' }], 10).then(function(){
+      res.textContent = '✓ 连接成功，可以保存启用。'; res.style.color = 'var(--green)';
+    }).catch(function(e){
+      AI = bak;
+      res.textContent = '✗ 连接失败：' + (e.message || '网络或配置错误') + '（检查地址/Key/模型，或该供应商不允许浏览器直连）';
+      res.style.color = 'var(--danger)';
+    });
+  };
+  $('btn-ai-save').onclick = function(){
+    readAISettings();
+    saveAI(); updateAiUi();
+    toast(AI.enabled ? '已保存并启用 AI 识别' : '已保存（AI 识别未启用）');
+    show(aiReturnView);
+  };
+}
+function readAISettings(){
+  AI.enabled = $('ai-enabled').checked;
+  AI.provider = $('ai-provider').value;
+  AI.baseUrl = $('ai-url').value.trim();
+  AI.apiKey = $('ai-key').value.trim();
+  AI.model = $('ai-model').value.trim();
 }
 
 /* ---------- 启动 ---------- */
 load();
+loadAI();
 renderHome();
 renderStageBar();
 bind();
+updateAiUi();
 if(state.msgs.length > 0 && state.scenario){
   show('chat'); renderMsgs();
 }
