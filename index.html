@@ -261,7 +261,7 @@
         <div><b>启用 AI 识别</b><br><span style="font-size:12px;color:var(--ink2);">关闭后全部在本机规则匹配</span></div>
         <input type="checkbox" id="ai-enabled">
       </div>
-      <p class="ai-note">开启后，她的话会发送给你选择的 AI 供应商用于识别情境与意图；密钥仅保存在此浏览器，本站无服务器、不存储任何内容。规则引擎始终作为兜底。</p>
+      <p class="ai-note">开启后，她的话会发送给你选择的 AI 供应商，AI 在语料库策略框架内定制回复并分析意图；密钥仅保存在此浏览器，本站无服务器、不存储任何内容。关闭或调用失败时自动回落规则引擎。</p>
       <div class="ai-field"><label>供应商</label>
         <select id="ai-provider">
           <option value="deepseek">DeepSeek</option>
@@ -791,70 +791,115 @@ function aiChat(messages, maxTokens){
     throw e;
   });
 }
-function buildAISystemPrompt(){
+function buildStrategyCatalog(){
   if(aiSysPrompt) return aiSysPrompt;
-  var lines = [
-    '你是亲子沟通模拟工具"耳根清净"的分类器。用户会给你一段家长（她）说的话，你的任务：',
-    '1. 判断这句话属于哪个情境（scenario）；2. 判断对话处于哪个阶段（stage，1确认诉求/2引向具体/3简短周旋/4暂停结束）；',
-    '3. 选出最合适的一条既有策略（strategy_id）；4. 用一句话分析她说这句话的核心诉求或目的（intent）。',
-    '只输出一个 JSON 对象：{"scenario":"topic键","stage":1,"strategy_id":"策略ID","intent":"一句话"}，不要输出任何其他内容。','',
-    '情境 topic 键：'
-  ];
-  Object.keys(SCENARIOS).forEach(function(k){ lines.push('- ' + k + '：' + SCENARIOS[k].name); });
-  lines.push('');
-  lines.push('可选策略ID（按情境分组）：');
+  var lines = [];
   Object.keys(SCENARIOS).forEach(function(k){
     var us = STRATEGIES.filter(function(u){ return u.sc === k; });
     if(!us.length) return;
-    lines.push(k + '：' + us.map(function(u){
-      return u.id + '(' + String(u.name).replace(/["\']/g,'') + ',阶段' + u.stage + ')';
+    lines.push('【' + SCENARIOS[k].name + '】' + us.map(function(u){
+      return u.id + '(' + String(u.name).replace(/["\\']/g,'') + ',阶段' + u.stage + ')';
     }).join('、'));
   });
   aiSysPrompt = lines.join('\n');
   return aiSysPrompt;
 }
-function aiClassify(text){
+var AI_GEN_SYSTEM = [
+  '你在"耳根清净"（一个帮助用户应对父母沟通压力的模拟练习工具）中，为用户生成一条针对"她"这句话的回复。',
+  '输出一个 JSON 对象：{"strategy_id":"策略ID","reply":"给她的回复","intent":"她这句话的核心诉求（一句话）","why":"这条回复为什么有效（一句话，结合她的原话）"}，不要输出其他内容。',
+  'reply 的硬性要求：',
+  '- 口语化，像真的会打出来的微信消息；1-2 句为宜，最多 3 句',
+  '- 贴合所选策略的意图与边界；不升级冲突、不讽刺、不说教、不喊口号',
+  '- 不使用"不是…而是…"及其变体句式；不用排比；不用书面腔',
+  '- 不替用户虚构承诺：做不到的事不答应，可改为"我会考虑/我会安排"',
+  '- 优先低冲突；若阶段偏后（简短周旋/暂停），回复要短',
+  '- 保持用户的决定权：建议可以听，决定归用户'
+].join('\n');
+
+function aiGenerate(text, hintUnit, stage, variant){
+  var user = '她说的原话：' + text + '\n';
+  user += '当前建议阶段：' + (stage ? STAGES[stage-1].name : '未知') + '\n';
+  if(hintUnit){
+    user += '\n规则引擎匹配到的基础策略：' + hintUnit.id + ' ' + hintUnit.name + '\n';
+    user += '该策略的回复参考：\n';
+    unitTones(hintUnit).forEach(function(t){ user += '- ' + TONES[t] + '：' + hintUnit.r[t] + '\n'; });
+    if(hintUnit.why) user += '策略原理：' + hintUnit.why + '\n';
+    if(hintUnit.caution) user += '注意事项：' + hintUnit.caution + '\n';
+    user += '\n请基于这条策略、针对她的原话定制回复。只有当她的话明显属于其他策略时才改选。\n\n策略目录：\n' + buildStrategyCatalog();
+  } else {
+    user += '\n规则引擎未能匹配，请从策略目录中选择最合适的一条并定制回复：\n' + buildStrategyCatalog();
+  }
+  if(variant > 1) user += '\n（这是第 ' + variant + ' 次生成，请换一个角度和措辞，意图保持一致。）';
   return aiChat([
-    { role:'system', content: buildAISystemPrompt() },
-    { role:'user', content: '她说的原话：' + text + '\n请只返回 JSON。' }
-  ], 350).then(function(content){
+    { role:'system', content: AI_GEN_SYSTEM },
+    { role:'user', content: user }
+  ], 600).then(function(content){
     var m = content.match(/\{[\s\S]*\}/);
     if(!m) return null;
     var j;
     try{ j = JSON.parse(m[0]); }catch(e){ return null; }
     var sid = j.strategy_id || j.strategyId;
-    var unit = sid ? (findUnit('C-' + sid) || findUnit(sid)) : null;
-    if(unit) return { sc:unit.sc, unit:unit, analysis:j.intent || '' };
-    var sc = (j.scenario && SCENARIOS[j.scenario]) ? j.scenario : null;
-    if(sc){
-      var st = parseInt(j.stage, 10);
-      var u2 = pickUnit(sc, normalize(text), (st >= 1 && st <= 4) ? st : null);
-      if(u2) return { sc:sc, unit:u2, analysis:j.intent || '' };
-    }
-    return null;
+    var unit = sid ? (findUnit('C-' + sid) || findUnit(sid)) : (hintUnit || null);
+    var reply = (j.reply || '').trim();
+    if(!unit || !reply || reply.length > 300) return null;
+    return { unit:unit, reply:reply, why:(j.why||'').trim(), intent:(j.intent||'').trim() };
   });
+}
+function ruleFallback(text, msg){
+  if(msg) toast(msg);
+  var r = match(text, null);
+  if(r.uncertain) pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
+  else applyMatch(r.sc, r.unit, text);
+  renderMsgs(); save();
 }
 function aiProcess(text){
   aiPending = true; updateAiUi();
-  toast('AI 识别中…');
-  aiClassify(text).then(function(res){
+  toast('AI 生成回复中…');
+  var r = match(text, null);
+  var hint = r.uncertain ? null : r.unit;
+  var stage = (!r.uncertain && r.sc) ? suggestedStage(r.sc) : null;
+  aiGenerate(text, hint, stage, 1).then(function(res){
     aiPending = false; updateAiUi();
     if(res){
-      applyMatch(res.sc, res.unit, text, false, res.analysis, true);
+      applyAIMatch(res, text);
     } else {
-      toast('AI 未识别，使用规则匹配');
-      var r = match(text, null);
-      if(r.uncertain) pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
-      else applyMatch(r.sc, r.unit, text);
+      ruleFallback(text, 'AI 未识别，使用规则匹配');
     }
-    renderMsgs(); save();
   }).catch(function(){
     aiPending = false; updateAiUi();
-    toast('AI 调用失败，已用规则匹配');
-    var r = match(text, null);
-    if(r.uncertain) pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
-    else applyMatch(r.sc, r.unit, text);
-    renderMsgs(); save();
+    ruleFallback(text, 'AI 调用失败，已用规则匹配');
+  });
+}
+function applyAIMatch(res, text){
+  var unit = res.unit;
+  state.scenario = unit.sc;
+  state.repeatCounts[unit.sc] = (state.repeatCounts[unit.sc] || 0) + 1;
+  var stage = suggestedStage(unit.sc);
+  pushMsg({ role:'info', text:'AI 定制 · 「' + SCENARIOS[unit.sc].name + '」 · 基于' + unit.name });
+  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:DEFAULT_TONE[stage], aiReply:res.reply, aiWhy:res.why, aiIntent:res.intent, src:text });
+  state.lastSuggest = { unit:unit.id, tone:DEFAULT_TONE[stage] };
+  if(!state.lastUnitBySc) state.lastUnitBySc = {};
+  state.lastUnitBySc[unit.sc] = unit.id;
+}
+function aiRegenerate(m, unit){
+  if(!aiActive()){ toast('未开启 AI，无法重新生成'); return; }
+  if(aiPending){ toast('AI 正在生成中…'); return; }
+  aiPending = true; updateAiUi();
+  toast('AI 换一种说法中…');
+  var v = (m.aiVariant || 1) + 1;
+  aiGenerate(m.src || '', unit, suggestedStage(unit.sc), v).then(function(res){
+    aiPending = false; updateAiUi();
+    if(res && res.reply){
+      m.aiReply = res.reply; m.aiWhy = res.why; m.aiIntent = res.intent; m.aiVariant = v;
+      renderMsgs(); save();
+      toast('已重新生成');
+    } else {
+      aiPending = false; updateAiUi(); toast('AI 未返回有效内容'); renderMsgs();
+    }
+  }).catch(function(){
+    aiPending = false; updateAiUi();
+    toast('AI 生成失败，保留当前回复');
+    renderMsgs();
   });
 }
 
@@ -1008,9 +1053,12 @@ function renderMsgs(){
         row3.className = 'm-row';
         var wrap = document.createElement('div');
         wrap.style.maxWidth = '80%';
+        var replyText = m.aiReply || unit.r[m.tone] || '';
         var lb = document.createElement('div');
         lb.className = 'tone-label';
-        lb.innerHTML = '建议回复 · <b>' + TONES[m.tone] + '</b> · ' + unit.name;
+        lb.innerHTML = m.aiReply
+          ? ('AI 定制回复 · 基于「' + unit.name + '」')
+          : ('建议回复 · <b>' + TONES[m.tone] + '</b> · ' + unit.name);
         wrap.appendChild(lb);
         if(m.generic){
           var gn = document.createElement('div');
@@ -1020,18 +1068,19 @@ function renderMsgs(){
         }
         var b3 = document.createElement('div');
         b3.className = 'bubble self';
-        b3.textContent = unit.r[m.tone];
+        b3.textContent = replyText;
         b3.onclick = function(){ openSheet(unit, m.tone, m); };
         wrap.appendChild(b3);
         var acts = document.createElement('div');
         acts.className = 'bubble-actions';
         var aCopy = document.createElement('a');
         aCopy.textContent = '复制';
-        aCopy.onclick = function(e){ e.stopPropagation(); copyText(unit.r[m.tone]); };
+        aCopy.onclick = function(e){ e.stopPropagation(); copyText(replyText); };
         var aAlt = document.createElement('a');
         aAlt.textContent = '换一种说法';
         aAlt.onclick = function(e){
           e.stopPropagation();
+          if(m.aiReply){ aiRegenerate(m, unit); return; }
           var tones = unitTones(unit);
           var next = tones[(tones.indexOf(m.tone) + 1) % tones.length];
           m.tone = next;
@@ -1107,11 +1156,11 @@ function handleSend(){
   }
   renderMsgs(); save();
 }
-function applyMatch(sc, unit, text, generic, aiAnalysis, fromAI){
+function applyMatch(sc, unit, text, generic){
   if(generic || !sc){
     // 未识别具体情境：直接给通用回复，不打断对话
     var gtone = 'g';
-    pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:gtone, generic:true, ai:aiAnalysis||'' });
+    pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:gtone, generic:true });
     state.lastSuggest = { unit:unit.id, tone:gtone };
     return;
   }
@@ -1119,9 +1168,9 @@ function applyMatch(sc, unit, text, generic, aiAnalysis, fromAI){
   state.repeatCounts[sc] = (state.repeatCounts[sc] || 0) + 1;
   var stage = suggestedStage(sc);
   var stageInfo = STAGES[stage-1];
-  pushMsg({ role:'info', text:(fromAI ? 'AI 识别 · ' : '') + '「' + SCENARIOS[sc].name + '」 · 建议：' + stageInfo.name + '（' + stageInfo.desc + '）' });
+  pushMsg({ role:'info', text:'「' + SCENARIOS[sc].name + '」 · 建议：' + stageInfo.name + '（' + stageInfo.desc + '）' });
   var tone = DEFAULT_TONE[stage];
-  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:tone, ai:aiAnalysis||'' });
+  pushMsg({ role:'sys', type:'suggest', unit:unit.id, tone:tone });
   state.lastSuggest = { unit:unit.id, tone:tone };
   if(!state.lastUnitBySc) state.lastUnitBySc = {};
   state.lastUnitBySc[sc] = unit.id;
@@ -1194,11 +1243,11 @@ function closeCbox(){ $('cbox').hidden = true; cboxCb = null; }
 
 /* ---------- 攻略弹层 ---------- */
 var sheetUnit = null, sheetTone = 'g';
-var sheetAi = '';
+var sheetMsg = null;
 function openSheet(unit, tone, msg){
   if(!unit) return;
   sheetUnit = unit; sheetTone = tone || 'g';
-  sheetAi = (msg && msg.ai) || '';
+  sheetMsg = msg || null;
   renderSheet();
   $('mask').hidden = false; $('sheet').hidden = false;
 }
@@ -1215,15 +1264,24 @@ function renderSheet(){
     b.onclick = function(){ sheetTone = t; renderSheet(); syncLastSuggestTone(t); };
     tabs.appendChild(b);
   });
-  var sc = SCENARIOS[u.sc];
-  var st = STAGES[u.stage-1];
+  var sc = SCENARIOS[u.sc] || { name:'通用', color:'#576b95' };
+  var st = STAGES[u.stage-1] || { name:'通用' };
   var html = '';
   html += '<div style="margin-bottom:12px;">'
        + '<span class="tag" style="background:' + sc.color + ';">' + sc.name + '</span> '
        + '<span class="tag" style="background:#576b95;">阶段' + u.stage + ' · ' + st.name + '</span>'
        + '</div>';
-  html += '<div class="sheet-reply" id="sheet-reply">' + esc(u.r[sheetTone]) + '</div>';
-  html += '<button class="btn btn-ghost sheet-copy" id="sheet-copy-btn">复制这条回复</button>';
+  var aiReply = sheetMsg && sheetMsg.aiReply;
+  if(aiReply){
+    html += '<div class="sheet-reply" id="sheet-reply">' + esc(aiReply) + '</div>';
+    html += '<button class="btn btn-ghost sheet-copy" id="sheet-copy-btn">复制这条回复</button>';
+    if(sheetMsg.aiWhy) html += gField('为什么这样说（AI）', sheetMsg.aiWhy);
+    if(sheetMsg.aiIntent) html += gField('她这句话的目的（AI 分析）', sheetMsg.aiIntent);
+    html += gField('基础策略 · ' + TONES[sheetTone] + '版（语料参考）', u.r[sheetTone] || '');
+  } else {
+    html += '<div class="sheet-reply" id="sheet-reply">' + esc(u.r[sheetTone]) + '</div>';
+    html += '<button class="btn btn-ghost sheet-copy" id="sheet-copy-btn">复制这条回复</button>';
+  }
   if(sheetTone === 's' && u.briefNote) html += gField('简短版适用说明', u.briefNote);
   html += gField('适合什么情况', u.fit);
   html += gField('当前要解决的核心问题', u.core);
@@ -1248,9 +1306,8 @@ function renderSheet(){
     html += '</div>';
   }
   $('sheet-body').innerHTML = html;
-  if(sheetAi) html = gField('AI 意图分析', sheetAi) + html;
   var cb = $('sheet-copy-btn');
-  if(cb) cb.onclick = function(){ copyText(u.r[sheetTone]); };
+  if(cb) cb.onclick = function(){ copyText((sheetMsg && sheetMsg.aiReply) || u.r[sheetTone]); };
 }
 function gField(label, text){
   if(!text) return '';
