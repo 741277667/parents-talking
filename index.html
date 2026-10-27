@@ -858,15 +858,25 @@ function aiProcess(text){
   var r = match(text, null);
   var hint = r.uncertain ? null : r.unit;
   var stage = (!r.uncertain && r.sc) ? suggestedStage(r.sc) : null;
+  pushMsg({ role:'info', text:'AI 正在生成定制回复…' });
+  renderMsgs(); save();
+  var popPending = function(){
+    var last = state.msgs[state.msgs.length-1];
+    if(last && last.role === 'info' && last.text.indexOf('AI 正在生成') === 0) state.msgs.pop();
+  };
   aiGenerate(text, hint, stage, 1).then(function(res){
     aiPending = false; updateAiUi();
     if(res){
+      popPending();
       applyAIMatch(res, text);
+      renderMsgs(); save();
     } else {
+      popPending();
       ruleFallback(text, 'AI 未识别，使用规则匹配');
     }
   }).catch(function(){
     aiPending = false; updateAiUi();
+    popPending();
     ruleFallback(text, 'AI 调用失败，已用规则匹配');
   });
 }
@@ -1143,7 +1153,7 @@ function handleSend(){
   input.value = ''; input.style.height = 'auto';
   snapshot();
   pushMsg({ role:'parent', text:text });
-  if(aiPending){ renderMsgs(); return; }
+  if(aiPending){ toast('AI 正在生成中，请稍候'); renderMsgs(); return; }
   if(aiActive()){
     aiProcess(text);
     return;
