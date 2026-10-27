@@ -53,6 +53,7 @@
   .home-hero .features{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
   .feat{font-size:12px; color:var(--ink2); background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px 10px;}
   .home-body{padding:8px 24px 32px;}
+  .cover-hint{font-size:12px; color:#a0a0a0; text-align:center; margin-top:10px;}
   .sec-title{font-size:13px; color:var(--ink2); margin:20px 0 10px;}
   .sc-grid{display:flex; flex-wrap:wrap; gap:10px;}
   .home-note{margin-top:26px; padding:14px 16px; background:#fff; border-radius:12px; border:1px solid var(--line); font-size:13px; color:var(--ink2);}
@@ -105,10 +106,7 @@
   }
   .fallback-box .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
   .chip-generic{border-style:dashed; color:var(--ink2);}
-  .tone-label{font-size:12px; color:var(--ink2); margin:0 4px 4px; text-align:left; display:flex; align-items:center; gap:6px;}
-  .tone-label>span:first-child{flex:1;}
-  .label-guide{font-size:12px; color:#576b95; cursor:pointer; white-space:nowrap;}
-  .label-guide:active{opacity:.6;}
+  .tone-label{font-size:12px; color:var(--ink2); margin:0 4px 4px; text-align:left;}
   .generic-note{font-size:12px; color:#a0a0a0; margin-top:5px;}
   .tone-label b{color:var(--green); font-weight:600;}
 
@@ -199,6 +197,7 @@
       <p class="sec-title">选择一个开始方式</p>
       <div class="sc-grid" id="sc-grid"></div>
       <button class="btn btn-primary" id="btn-start-free" style="width:100%; margin-top:16px;">开始模拟</button>
+      <p class="cover-hint">开始后点击绿色回复气泡，可查看这条回复的用意和后续应对</p>
       <p class="sec-title">或者</p>
       <button class="btn btn-ghost" id="btn-guide" style="width:100%;">看看应对攻略</button>
       <div class="home-foot">
@@ -767,7 +766,7 @@ function startChat(scKey){
   renderStageBar();
   if(state.msgs.length === 0){
     pushMsg({ role:'info', text:'已进入「' + SCENARIOS[scKey].name + '」情境' });
-    pushMsg({ role:'sys', type:'plain', text:'把她说过的原话粘贴进来，我会直接给出应对；识别不了时会用通用回复接住。点建议回复可看它的用意和后续应对。每轮之后阶段自动推进，也可以点上方标签手动切换。' });
+    pushMsg({ role:'sys', type:'plain', text:'把她说过的原话粘贴进来，我会直接给出应对；识别不了时会用通用回复接住。每轮之后阶段自动推进，也可以点上方标签手动切换。' });
   }
   renderMsgs(); save();
 }
@@ -826,8 +825,7 @@ function renderMsgs(){
         wrap.style.maxWidth = '80%';
         var lb = document.createElement('div');
         lb.className = 'tone-label';
-        lb.innerHTML = '<span>建议回复 · <b>' + TONES[m.tone] + '</b> · ' + unit.name + '</span><a class="label-guide">看攻略 ›</a>';
-        lb.querySelector('.label-guide').onclick = function(e){ e.stopPropagation(); openSheet(unit, m.tone); };
+        lb.innerHTML = '建议回复 · <b>' + TONES[m.tone] + '</b> · ' + unit.name;
         wrap.appendChild(lb);
         if(m.generic){
           var gn = document.createElement('div');
