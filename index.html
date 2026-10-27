@@ -104,6 +104,7 @@
     padding:12px 14px; font-size:14px;
   }
   .fallback-box .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+  .chip-generic{border-style:dashed; color:var(--ink2);}
   .tone-label{font-size:12px; color:var(--ink2); margin:0 4px 4px; text-align:left;}
   .generic-note{font-size:12px; color:#a0a0a0; margin-top:5px;}
   .tone-label b{color:var(--green); font-weight:600;}
@@ -695,7 +696,7 @@ function matchScenario(text, forced){
     if(forced && key === forced){ s += 10; }
     if(s > bestScore){ bestScore = s; best = key; }
   });
-  if(!best || bestScore < 1) return { scenario:null, scores:scores };
+  if(!best || bestScore < 2) return { scenario:null, scores:scores };
   return { scenario:best, scores:scores };
 }
 function suggestedStage(sc){
@@ -728,9 +729,9 @@ function match(text, forcedSc){
     }
   }
   var r = matchScenario(t, forcedSc);
-  if(!r.scenario) return { sc:null, unit:findUnit('GEN01'), generic:true };
+  if(!r.scenario) return { sc:null, uncertain:true };
   var unit = pickUnit(r.scenario, t);
-  if(!unit) return { sc:null, unit:findUnit('GEN01'), generic:true };
+  if(!unit) return { sc:null, uncertain:true };
   return { sc:r.scenario, unit:unit };
 }
 
@@ -854,6 +855,28 @@ function renderMsgs(){
         wrap.appendChild(acts);
         row3.appendChild(wrap);
         box.appendChild(row3);
+      } else if(m.type === 'fallback'){
+        var fb = document.createElement('div');
+        fb.className = 'fallback-box';
+        fb.innerHTML = '这句话我不太确定属于哪一类。<br>选一个最接近的，我来给应对：';
+        var chips = document.createElement('div');
+        chips.className = 'chips';
+        m.candidates.forEach(function(key){
+          var sc = SCENARIOS[key];
+          if(!sc) return;
+          var c = document.createElement('button');
+          c.className = 'chip'; c.style.fontSize = '13px';
+          c.textContent = sc.chip;
+          c.onclick = function(){ resolveForced(key, m.source); };
+          chips.appendChild(c);
+        });
+        var gc = document.createElement('button');
+        gc.className = 'chip chip-generic'; gc.style.fontSize = '13px';
+        gc.textContent = '都不太符合，使用通用回复';
+        gc.onclick = function(){ applyGeneric(m.source); };
+        chips.appendChild(gc);
+        fb.appendChild(chips);
+        box.appendChild(fb);
       }
     }
   });
@@ -884,7 +907,11 @@ function handleSend(){
   snapshot();
   pushMsg({ role:'parent', text:text });
   var r = match(text, null);
-  applyMatch(r.sc, r.unit, text, r.generic);
+  if(r.uncertain){
+    pushMsg({ role:'sys', type:'fallback', candidates:Object.keys(SCENARIOS), source:text });
+  } else {
+    applyMatch(r.sc, r.unit, text, r.generic);
+  }
   renderMsgs(); save();
 }
 function applyMatch(sc, unit, text, generic){
@@ -906,6 +933,21 @@ function applyMatch(sc, unit, text, generic){
   if(!state.lastUnitBySc) state.lastUnitBySc = {};
   state.lastUnitBySc[sc] = unit.id;
 }
+function resolveForced(sc, text){
+  snapshot();
+  pushMsg({ role:'info', text:'按「' + SCENARIOS[sc].name + '」处理' });
+  var t = normalize(text);
+  var unit = pickUnit(sc, t);
+  applyMatch(sc, unit, text);
+  renderMsgs(); save();
+}
+function applyGeneric(text){
+  snapshot();
+  pushMsg({ role:'info', text:'使用通用回复' });
+  applyMatch(null, findUnit('GEN01'), text, true);
+  renderMsgs(); save();
+}
+
 /* ---------- 快捷操作 ---------- */
 function toast(text){
   var t = $('toast');
