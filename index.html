@@ -1105,7 +1105,8 @@ function renderMsgs(){
       } else if(m.type === 'fallback'){
         var fb = document.createElement('div');
         fb.className = 'fallback-box';
-        fb.innerHTML = '这句话我不太确定属于哪一类。<br>选一个最接近的，我来给应对：';
+        fb.innerHTML = '<b style="font-size:15px;">你觉得，这是哪类情况？</b><br>'
+           + '<span style="font-size:13px;color:var(--ink2);">想不出来也没关系，选一个最接近的感受，我先按它来给应对。</span>';
         var chips = document.createElement('div');
         chips.className = 'chips';
         m.candidates.forEach(function(key){
